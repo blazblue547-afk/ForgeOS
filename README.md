@@ -95,6 +95,7 @@ sudo make install DISK=/dev/nvme0n1
 - A ForgeOS-native `neofetch` command is included in the overlay with a custom ForgeOS ASCII logo at `/usr/share/neofetch/ascii/distro/forgeos`.
 - The console starts an immediate root shell on `tty1` and `ttyS0` through native systemd units instead of BusyBox `inittab`.
 - The system bus is provided by source-built `dbus-daemon` and socket-activated at `/run/dbus/system_bus_socket`.
+- `systemd-logind` is included in the source-built systemd layer, owns `org.freedesktop.login1` on the system bus, and provides `loginctl` plus the logind varlink socket.
 - DHCP networking is handled by `systemd-networkd`; DNS is handled by `systemd-resolved`, with `/etc/resolv.conf` linked to `/run/systemd/resolve/resolv.conf`.
 - `ENABLE_DESKTOP=1` adds an Openbox/tint2/PCManFM desktop layer to the normal ForgeOS rootfs by extracting a minimal Debian package payload while preserving the source-built systemd and D-Bus daemons.
 - `DESKTOP=gnome` switches rootfs assembly to a Debian package bootstrap because GNOME depends on a large desktop stack that ForgeOS does not source-build yet.

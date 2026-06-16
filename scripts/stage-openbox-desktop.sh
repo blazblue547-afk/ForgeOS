@@ -183,8 +183,8 @@ EOF
     cat > "$ROOTFS_STAGING_DIR/etc/systemd/system/forgeos-desktop.service" <<'EOF'
 [Unit]
 Description=ForgeOS Openbox desktop
-Wants=dbus.service systemd-udevd.service
-After=dbus.service systemd-udevd.service systemd-user-sessions.service
+Wants=dbus.service systemd-logind.service systemd-udevd.service
+After=dbus.service systemd-logind.service systemd-udevd.service systemd-user-sessions.service
 Conflicts=forgeos-shell@tty1.service getty@tty1.service
 
 [Service]

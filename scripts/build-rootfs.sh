@@ -12,7 +12,7 @@ require_cmd make rsync cpio gzip
 ensure_dirs
 
 [[ -x "$BUSYBOX_BUILD_DIR/busybox" ]] || "$ROOT_DIR/scripts/build-busybox.sh"
-[[ -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd" && -f "$SYSTEMD_STAGING_DIR/.forgeos-systemd-complete" ]] || "$ROOT_DIR/scripts/build-systemd.sh"
+[[ -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd" && -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd-logind" && -f "$SYSTEMD_STAGING_DIR/.forgeos-systemd-complete" ]] || "$ROOT_DIR/scripts/build-systemd.sh"
 [[ -x "$DBUS_STAGING_DIR/usr/bin/dbus-daemon" && -f "$DBUS_STAGING_DIR/.forgeos-dbus-complete" ]] || "$ROOT_DIR/scripts/build-dbus.sh"
 [[ -f "$OUT_DIR/bzImage" ]] || "$ROOT_DIR/scripts/build-kernel.sh"
 
@@ -48,6 +48,16 @@ ln -sfn /etc/systemd/system/forgeos-bootdiag.service \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/forgeos-bootdiag.service"
 ln -sfn /etc/systemd/system/forgeos-console-banner.service \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/forgeos-console-banner.service"
+ln -sfn /usr/lib/systemd/system/dbus.service \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/dbus.service"
+ln -sfn /usr/lib/systemd/system/dbus.socket \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/sockets.target.wants/dbus.socket"
+ln -sfn /usr/lib/systemd/system/systemd-logind.service \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/systemd-logind.service"
+ln -sfn /usr/lib/systemd/system/systemd-logind.service \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/dbus-org.freedesktop.login1.service"
+ln -sfn /usr/lib/systemd/system/systemd-logind-varlink.socket \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/sockets.target.wants/systemd-logind-varlink.socket"
 ln -sfn /usr/lib/systemd/system/systemd-networkd.service \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/systemd-networkd.service"
 ln -sfn /usr/lib/systemd/system/systemd-resolved.service \

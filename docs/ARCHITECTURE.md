@@ -24,7 +24,7 @@ ForgeOS currently targets UEFI systems.
 4. The built kernel EFI stub is copied to `EFI/BOOT/FORGEOS.EFI`.
 5. UEFI firmware executes GRUB from `EFI/BOOT/BOOTX64.EFI`, and GRUB starts the kernel.
 6. The built-in kernel command line mounts `PARTLABEL=root` as the real root filesystem.
-7. systemd starts as `/sbin/init`, activates the D-Bus system bus, starts `systemd-resolved` and `systemd-networkd`, reaches `multi-user.target`, and launches ForgeOS root-shell services on `tty1` and `ttyS0`.
+7. systemd starts as `/sbin/init`, activates the D-Bus system bus, starts `systemd-logind`, `systemd-resolved`, and `systemd-networkd`, reaches `multi-user.target`, and launches ForgeOS root-shell services on `tty1` and `ttyS0`.
 
 ## Root Filesystem Model
 
@@ -37,7 +37,7 @@ The root filesystem is assembled in `staging/rootfs` from:
 - kernel modules from the kernel build
 - the repository overlay in `overlay/rootfs`
 
-The default network path uses DHCP through `systemd-networkd`. DNS servers learned from DHCP are exposed through `systemd-resolved`, and `/etc/resolv.conf` is a symlink to the resolved-managed compatibility file at `/run/systemd/resolve/resolv.conf`. Tools that query systemd over D-Bus use the system bus at `/run/dbus/system_bus_socket`.
+The default network path uses DHCP through `systemd-networkd`. DNS servers learned from DHCP are exposed through `systemd-resolved`, and `/etc/resolv.conf` is a symlink to the resolved-managed compatibility file at `/run/systemd/resolve/resolv.conf`. Tools that query systemd over D-Bus use the system bus at `/run/dbus/system_bus_socket`. The source-built systemd layer also includes `systemd-logind`, `loginctl`, the `org.freedesktop.login1` system-bus policy, and the logind varlink socket.
 
 The default console build also generates `out/rootfs.cpio.gz` for quick QEMU smoke tests. Desktop-enabled rootfs builds skip the initramfs artifact and boot through the ext4 root partition image.
 

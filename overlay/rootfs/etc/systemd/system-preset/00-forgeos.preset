@@ -5,6 +5,8 @@ enable forgeos-bootdiag.service
 enable forgeos-console-banner.service
 enable dbus.service
 enable dbus.socket
+enable systemd-logind.service
+enable systemd-logind-varlink.socket
 enable systemd-networkd.service
 enable systemd-networkd.socket
 enable systemd-resolved.service

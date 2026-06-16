@@ -4,7 +4,7 @@ set -euo pipefail
 
 source "$(dirname "$0")/common.sh"
 
-require_cmd meson ninja pkg-config "$CC" file ldd ldconfig install tar gzip
+require_cmd meson ninja pkg-config "$CC" gperf file ldd ldconfig install tar gzip
 ensure_dirs
 
 [[ -z "$CROSS_COMPILE" ]] || die "systemd rootfs staging currently requires a native build; CROSS_COMPILE is not supported"
@@ -44,9 +44,10 @@ copy_elf_deps() {
 
 copy_named_library() {
     local soname=$1
-    local path
+    local ldconfig_output path
 
-    path=$(ldconfig -p 2>/dev/null | awk -v soname="$soname" '$1 == soname { print $NF; exit }')
+    ldconfig_output=$(ldconfig -p 2>/dev/null || true)
+    path=$(awk -v soname="$soname" '$1 == soname { print $NF; exit }' <<< "$ldconfig_output")
     [[ -n "$path" ]] || die "could not locate runtime library: $soname"
     copy_runtime_dep "$path"
     copy_elf_deps "$path"
@@ -102,7 +103,7 @@ meson setup "$SYSTEMD_BUILD_DIR" "$SYSTEMD_SRC_DIR" \
     -Dcoredump=false \
     -Dpstore=false \
     -Doomd=false \
-    -Dlogind=false \
+    -Dlogind=true \
     -Dhostnamed=false \
     -Dlocaled=false \
     -Dmachined=false \
@@ -194,5 +195,8 @@ done < <(find "$SYSTEMD_STAGING_DIR" -type f \( -perm /111 -o -name '*.so' -o -n
 copy_named_library libmount.so.1
 
 [[ -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd" ]] || die "systemd binary was not installed"
+[[ -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd-logind" ]] || die "systemd-logind binary was not installed"
+[[ -x "$SYSTEMD_STAGING_DIR/usr/bin/loginctl" ]] || die "loginctl binary was not installed"
+[[ -f "$SYSTEMD_STAGING_DIR/usr/share/dbus-1/system.d/org.freedesktop.login1.conf" ]] || die "logind D-Bus policy was not installed"
 touch "$SYSTEMD_STAGING_DIR/.forgeos-systemd-complete"
 msg "systemd staging tree: $SYSTEMD_STAGING_DIR"

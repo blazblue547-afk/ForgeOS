@@ -1,7 +1,7 @@
 [Unit]
 Description=ForgeOS root shell on %I
 Documentation=man:systemd.service(5)
-After=systemd-user-sessions.service
+After=systemd-logind.service systemd-user-sessions.service
 Before=getty.target
 IgnoreOnIsolate=yes
 
