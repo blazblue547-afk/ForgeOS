@@ -18,6 +18,7 @@ DBUS_VERSION=${DBUS_VERSION:-1.16.2}
 PAM_VERSION=${PAM_VERSION:-1.7.2}
 DESKTOP=${DESKTOP:-console}
 ENABLE_DESKTOP=${ENABLE_DESKTOP:-0}
+ENABLE_DOOM_EMACS=${ENABLE_DOOM_EMACS:-0}
 ROOT_LABEL=${ROOT_LABEL:-FORGE_ROOT}
 EFI_LABEL=${EFI_LABEL:-FORGE_EFI}
 case "$DESKTOP" in
@@ -30,7 +31,7 @@ esac
 if [[ -z "${IMAGE_SIZE_MIB:-}" ]]; then
     if [[ "$DESKTOP" == "gnome" ]]; then
         IMAGE_SIZE_MIB=12288
-    elif [[ "$ENABLE_DESKTOP" =~ ^(1|true|TRUE|yes|YES|on|ON)$ ]]; then
+    elif [[ "$ENABLE_DESKTOP" =~ ^(1|true|TRUE|yes|YES|on|ON)$ || "$ENABLE_DOOM_EMACS" =~ ^(1|true|TRUE|yes|YES|on|ON)$ ]]; then
         IMAGE_SIZE_MIB=4096
     else
         IMAGE_SIZE_MIB=2048
@@ -60,8 +61,12 @@ PAM_TARBALL="linux-pam-${PAM_VERSION}.tar.gz"
 PAM_URL="https://github.com/linux-pam/linux-pam/archive/refs/tags/v${PAM_VERSION}.tar.gz"
 GNOME_SUITE=${GNOME_SUITE:-trixie}
 GNOME_MIRROR=${GNOME_MIRROR:-http://deb.debian.org/debian}
+DOOM_EMACS_GIT_URL=${DOOM_EMACS_GIT_URL:-https://github.com/doomemacs/doomemacs.git}
+DOOM_EMACS_REF=${DOOM_EMACS_REF:-master}
+DOOM_EMACS_PACKAGES=${DOOM_EMACS_PACKAGES:-emacs-nox git ripgrep fd-find findutils ca-certificates}
 OPENBOX_DESKTOP_PACKAGES=${OPENBOX_DESKTOP_PACKAGES:-openbox tint2 pcmanfm xinit xserver-xorg-core xserver-xorg-input-libinput xserver-xorg-video-fbdev xserver-xorg-video-vesa xserver-xorg-video-vmware lxterminal fonts-dejavu adwaita-icon-theme hicolor-icon-theme shared-mime-info}
 OPENBOX_DESKTOP_SKIP_PACKAGES=${OPENBOX_DESKTOP_SKIP_PACKAGES:-base-files dbus dbus-bin dbus-daemon dbus-session-bus-common dbus-system-bus-common dbus-user-session debconf dpkg init-system-helpers keyboard-configuration libpam-systemd mount procps systemd systemd-sysv sysvinit-utils tar tzdata udev}
+DOOM_EMACS_SKIP_PACKAGES=${DOOM_EMACS_SKIP_PACKAGES:-$OPENBOX_DESKTOP_SKIP_PACKAGES}
 
 KERNEL_SRC_DIR="$SOURCE_DIR/linux-${KERNEL_VERSION}"
 BUSYBOX_SRC_DIR="$SOURCE_DIR/busybox-${BUSYBOX_VERSION}"
@@ -73,6 +78,7 @@ BUSYBOX_BUILD_DIR="$BUILD_DIR/busybox-${BUSYBOX_VERSION}"
 SYSTEMD_BUILD_DIR="$BUILD_DIR/systemd-${SYSTEMD_VERSION}"
 DBUS_BUILD_DIR="$BUILD_DIR/dbus-${DBUS_VERSION}"
 PAM_BUILD_DIR="$BUILD_DIR/linux-pam-${PAM_VERSION}"
+DOOM_EMACS_SRC_DIR="$SOURCE_DIR/doomemacs"
 MODULES_STAGING_DIR="$STAGING_DIR/modules"
 SYSTEMD_STAGING_DIR="$STAGING_DIR/systemd"
 DBUS_STAGING_DIR="$STAGING_DIR/dbus"
@@ -80,6 +86,8 @@ PAM_STAGING_DIR="$STAGING_DIR/pam"
 ROOTFS_STAGING_DIR="$STAGING_DIR/rootfs"
 OPENBOX_DESKTOP_DEB_DIR=${OPENBOX_DESKTOP_DEB_DIR:-"$DOWNLOAD_DIR/openbox-desktop-debs"}
 OPENBOX_DESKTOP_APT_STATE_DIR=${OPENBOX_DESKTOP_APT_STATE_DIR:-"$BUILD_DIR/openbox-desktop-apt-state"}
+DOOM_EMACS_DEB_DIR=${DOOM_EMACS_DEB_DIR:-"$DOWNLOAD_DIR/doom-emacs-debs"}
+DOOM_EMACS_APT_STATE_DIR=${DOOM_EMACS_APT_STATE_DIR:-"$BUILD_DIR/doom-emacs-apt-state"}
 
 msg() {
     printf '==> %s\n' "$*"

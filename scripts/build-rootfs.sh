@@ -146,6 +146,10 @@ if truthy "$ENABLE_DESKTOP"; then
     "$ROOT_DIR/scripts/stage-openbox-desktop.sh"
 fi
 
+if truthy "$ENABLE_DOOM_EMACS"; then
+    "$ROOT_DIR/scripts/stage-doom-emacs.sh"
+fi
+
 chmod 755 \
     "$ROOTFS_STAGING_DIR/init" \
     "$ROOTFS_STAGING_DIR/sbin/forgeos-bootdiag" \

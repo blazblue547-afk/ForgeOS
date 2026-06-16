@@ -15,6 +15,7 @@ packages=(
     flex
     ca-certificates
     curl
+    git
     tar
     xz-utils
     bzip2
@@ -47,6 +48,7 @@ required_commands=(
     make
     gcc
     curl
+    git
     tar
     xz
     bzip2
@@ -65,6 +67,7 @@ required_commands=(
     ldd
     ldconfig
     install
+    dpkg-deb
     qemu-system-x86_64
 )
 
@@ -83,8 +86,8 @@ Options:
   --help        Show this help.
 
 This does not install desktop, GNOME, disk-image, installer, or Secure Boot
-extras. It is intentionally scoped to the console rootfs and direct QEMU run
-path.
+extras. It includes the host tools needed to enable optional rootfs layers such
+as Doom Emacs, but it does not install those target packages on the host.
 EOF
 }
 

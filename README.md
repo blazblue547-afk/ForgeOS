@@ -13,6 +13,7 @@ As of `2026-06-16`, the project defaults to:
 - 64-bit only
 - UEFI boot
 - text console only
+- optional Doom Emacs tool layer for the normal rootfs
 - optional GNOME desktop image using Debian `trixie` packages
 
 ## What This Repository Produces
@@ -63,6 +64,16 @@ ENABLE_DESKTOP=1 make run-desktop
 
 This keeps the regular ForgeOS rootfs path and stages Openbox, tint2, PCManFM, Xorg, fonts, icons, and a terminal into it. The serial login prompt remains on `ttyS0`; `tty1` starts the desktop session.
 
+To add Doom Emacs without switching OS flavors:
+
+```bash
+cd /home/joe/forgeos
+ENABLE_DOOM_EMACS=1 make image
+ENABLE_DOOM_EMACS=1 make run-image
+```
+
+This keeps the normal ForgeOS rootfs path and stages Emacs, Git, ripgrep, GNU find, fd, CA certificates, and the Doom Emacs Git checkout. On first shell login, ForgeOS seeds the user's `~/.config/emacs` and `~/.config/doom` from the staged Doom checkout and adds the Doom `bin` directory to `PATH`. Log in as `forge`, then run `doom sync` to fetch and compile the per-user Doom package set, followed by `doom doctor` if you want a dependency check.
+
 To build a GNOME desktop image, install `mmdebstrap` on the host and use the GNOME targets:
 
 ```bash
@@ -101,6 +112,7 @@ sudo make install DISK=/dev/nvme0n1
 - `systemd-logind` is included in the source-built systemd layer, owns `org.freedesktop.login1` on the system bus, and provides `loginctl` plus the logind varlink socket. `pam_systemd.so` registers console logins as logind sessions.
 - DHCP networking is handled by `systemd-networkd`; DNS is handled by `systemd-resolved`, with `/etc/resolv.conf` linked to `/run/systemd/resolve/resolv.conf`.
 - `ENABLE_DESKTOP=1` adds an Openbox/tint2/PCManFM desktop layer to the normal ForgeOS rootfs by extracting a minimal Debian package payload while preserving the source-built systemd and D-Bus daemons.
+- `ENABLE_DOOM_EMACS=1` adds a Doom Emacs layer to the normal ForgeOS rootfs by extracting the needed Debian runtime packages and staging the upstream Doom Emacs Git checkout under `/usr/share/doom-emacs`.
 - `DESKTOP=gnome` switches rootfs assembly to a Debian package bootstrap because GNOME depends on a large desktop stack that ForgeOS does not source-build yet.
 
 Set `BOOTLOADER=stub` when building an image to use the direct kernel EFI-stub fallback path instead of GRUB.
@@ -140,6 +152,7 @@ Linux-PAM, systemd, and D-Bus are built with Meson/Ninja and staged dynamically.
 - There is no package manager yet.
 - Account management is limited to the built-in `forge` and `root` accounts.
 - The Openbox desktop layer is a staged runtime payload, not an in-OS package manager.
+- The Doom Emacs layer stages the framework and runtime tools, but the per-user Doom package cache is initialized with `doom sync` after first login.
 - GNOME support is currently a package-bootstrapped desktop flavor, not a source-built ForgeOS desktop stack.
 - The installer is host-side only; there is no in-OS guided installer yet.
 

@@ -1,4 +1,4 @@
-PATH=/bin:/sbin:/usr/bin:/usr/sbin
+PATH=/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
 
 PS1='[forgeos \w]# '
@@ -7,3 +7,10 @@ export PS1
 alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
+
+if [ -d /etc/profile.d ]; then
+    for profile_script in /etc/profile.d/*.sh; do
+        [ -r "$profile_script" ] && . "$profile_script"
+    done
+    unset profile_script
+fi

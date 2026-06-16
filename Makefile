@@ -8,10 +8,12 @@ export DBUS_VERSION ?= 1.16.2
 export PAM_VERSION ?= 1.7.2
 export DESKTOP ?= console
 export ENABLE_DESKTOP ?= 0
+export ENABLE_DOOM_EMACS ?= 0
 export ROOT_LABEL ?= FORGE_ROOT
 export EFI_LABEL ?= FORGE_EFI
 desktop_enabled := $(filter 1 true TRUE yes YES on ON,$(ENABLE_DESKTOP))
-export IMAGE_SIZE_MIB ?= $(if $(filter gnome,$(DESKTOP)),12288,$(if $(desktop_enabled),4096,2048))
+doom_emacs_enabled := $(filter 1 true TRUE yes YES on ON,$(ENABLE_DOOM_EMACS))
+export IMAGE_SIZE_MIB ?= $(if $(filter gnome,$(DESKTOP)),12288,$(if $(or $(desktop_enabled),$(doom_emacs_enabled)),4096,2048))
 export ESP_SIZE_MIB ?= 256
 export JOBS ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
 export SECURE_BOOT ?= 0
@@ -20,7 +22,7 @@ export SECURE_BOOT_CERT ?=
 export GNOME_SUITE ?= trixie
 export GNOME_MIRROR ?= http://deb.debian.org/debian
 
-.PHONY: help deps image-deps fetch kernel busybox pam systemd dbus rootfs gnome-rootfs image gnome-image secure-boot-keys run run-image run-desktop run-gnome list-disks install clean distclean
+.PHONY: help deps image-deps fetch kernel busybox pam systemd dbus rootfs doom-emacs gnome-rootfs image gnome-image secure-boot-keys run run-image run-desktop run-gnome list-disks install clean distclean
 
 help:
 	@printf '%s\n' \
@@ -35,6 +37,8 @@ help:
 		'  make dbus       - build the D-Bus system bus daemon' \
 		'  make rootfs     - assemble the systemd rootfs and initramfs' \
 		'  ENABLE_DESKTOP=1 make rootfs - add Openbox/tint2/PCManFM desktop' \
+		'  ENABLE_DOOM_EMACS=1 make rootfs - add Emacs + Doom Emacs tooling' \
+		'  make doom-emacs - rebuild rootfs with the Doom Emacs layer enabled' \
 		'  make gnome-rootfs - assemble a Debian GNOME desktop rootfs' \
 		'  make image      - build a bootable GPT/UEFI disk image' \
 		'  make gnome-image - build a bootable GPT/UEFI GNOME disk image' \
@@ -74,6 +78,9 @@ dbus: fetch
 
 rootfs:
 	@./scripts/build-rootfs.sh
+
+doom-emacs: ENABLE_DOOM_EMACS = 1
+doom-emacs: rootfs
 
 gnome-rootfs: DESKTOP = gnome
 gnome-rootfs: IMAGE_SIZE_MIB = 12288
