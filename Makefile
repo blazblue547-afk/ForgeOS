@@ -19,12 +19,13 @@ export SECURE_BOOT_CERT ?=
 export GNOME_SUITE ?= trixie
 export GNOME_MIRROR ?= http://deb.debian.org/debian
 
-.PHONY: help deps fetch kernel busybox systemd dbus rootfs gnome-rootfs image gnome-image secure-boot-keys run run-image run-desktop run-gnome list-disks install clean distclean
+.PHONY: help deps image-deps fetch kernel busybox systemd dbus rootfs gnome-rootfs image gnome-image secure-boot-keys run run-image run-desktop run-gnome list-disks install clean distclean
 
 help:
 	@printf '%s\n' \
 		'ForgeOS targets:' \
 		'  make deps       - install Debian/Ubuntu host deps for rootfs + run' \
+		'  make image-deps - install Debian/Ubuntu host deps for image + run-image' \
 		'  make fetch      - download upstream source tarballs' \
 		'  make kernel     - build the Linux kernel and stage modules' \
 		'  make busybox    - build BusyBox rescue utilities' \
@@ -47,6 +48,9 @@ help:
 
 deps:
 	@./scripts/install-deps.sh
+
+image-deps:
+	@./scripts/install-image-deps.sh
 
 fetch:
 	@./scripts/fetch-sources.sh

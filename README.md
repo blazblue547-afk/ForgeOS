@@ -45,6 +45,7 @@ To build a UEFI disk image:
 
 ```bash
 cd /home/joe/forgeos
+sudo scripts/install-image-deps.sh
 make image
 make run-image
 ```
