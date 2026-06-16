@@ -1,0 +1,29 @@
+# Local Codex/agent state
+.agents/
+.codex/
+
+# Build and staging outputs
+build/
+downloads/
+out/
+sources/
+staging/
+
+# Generated boot artifacts and disk images
+*.cpio
+*.cpio.gz
+*.efi
+*.EFI
+*.img
+*.iso
+
+# Generated signing material
+*.cer
+*.crt
+*.key
+*.pem
+
+# Local logs and temporary files
+*.log
+*.tmp
+tmp/

@@ -1,0 +1,12 @@
+[Unit]
+Description=Print ForgeOS console banner
+Documentation=man:systemd.service(5)
+After=systemd-user-sessions.service
+ConditionPathExists=/sbin/forgeos-console-banner
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/forgeos-console-banner
+
+[Install]
+WantedBy=multi-user.target

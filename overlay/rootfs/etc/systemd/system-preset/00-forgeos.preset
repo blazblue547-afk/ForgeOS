@@ -1,0 +1,15 @@
+disable *
+enable forgeos-shell@tty1.service
+enable forgeos-shell@ttyS0.service
+enable forgeos-bootdiag.service
+enable forgeos-console-banner.service
+enable dbus.service
+enable dbus.socket
+enable systemd-networkd.service
+enable systemd-networkd.socket
+enable systemd-resolved.service
+enable systemd-resolved-monitor.socket
+enable systemd-resolved-varlink.socket
+enable systemd-udevd.service
+enable systemd-udevd-control.socket
+enable systemd-udevd-kernel.socket

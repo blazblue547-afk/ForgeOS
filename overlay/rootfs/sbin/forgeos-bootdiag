@@ -1,0 +1,176 @@
+#!/bin/sh
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH
+
+STAGE=${1:-userspace}
+ESP_MOUNT=/mnt/esp
+MARKER_DIR=$ESP_MOUNT/EFI/BOOT/diag
+MARKER_FILE=$MARKER_DIR/boot.log
+MOUNTED_ESP=0
+
+try_beep() {
+    command -v beep >/dev/null 2>&1 || return 0
+    beep -f 880 -l 120 -d 80 -r 2 >/dev/null 2>&1 || true
+}
+
+try_led_blink() {
+    local led
+    local i
+    local found=0
+
+    for led in /sys/class/leds/*capslock* /sys/class/leds/*numlock*; do
+        [ -w "$led/brightness" ] || continue
+        found=1
+        for i in 1 2 3; do
+            echo 1 > "$led/brightness" 2>/dev/null || true
+            sleep 0.15
+            echo 0 > "$led/brightness" 2>/dev/null || true
+            sleep 0.15
+        done
+    done
+
+    [ "$found" -eq 1 ] || return 0
+}
+
+try_backlight_on() {
+    local backlight
+    local max
+
+    for backlight in /sys/class/backlight/*; do
+        [ -w "$backlight/brightness" ] || continue
+        max=$(cat "$backlight/max_brightness" 2>/dev/null || true)
+        case "$max" in
+            ''|*[!0-9]*|0)
+                continue
+                ;;
+        esac
+        echo "$max" > "$backlight/brightness" 2>/dev/null || true
+    done
+}
+
+mount_esp() {
+    local dev
+
+    mkdir -p "$ESP_MOUNT"
+    MOUNTED_ESP=0
+
+    if grep -q " $ESP_MOUNT " /proc/mounts 2>/dev/null; then
+        return 0
+    fi
+
+    for dev in \
+        /dev/disk/by-label/FORGE_EFI \
+        /dev/sd[a-z][0-9] \
+        /dev/vd[a-z][0-9] \
+        /dev/nvme[0-9]n[0-9]p[0-9] \
+        /dev/mmcblk[0-9]p[0-9]; do
+        [ -b "$dev" ] || continue
+        mount -t vfat -o rw "$dev" "$ESP_MOUNT" 2>/dev/null || continue
+        if [ -f "$ESP_MOUNT/EFI/BOOT/FORGEOS.EFI" ]; then
+            MOUNTED_ESP=1
+            return 0
+        fi
+        umount "$ESP_MOUNT" 2>/dev/null || true
+    done
+
+    return 1
+}
+
+print_file() {
+    local title=$1
+    local path=$2
+
+    echo "--- $title ---"
+    if [ -r "$path" ]; then
+        cat "$path" 2>/dev/null || true
+    else
+        echo "unavailable: $path"
+    fi
+    echo
+}
+
+print_cmd() {
+    local title=$1
+    shift
+
+    echo "--- $title ---"
+    "$@" 2>/dev/null || true
+    echo
+}
+
+print_framebuffers() {
+    local fb
+    local attr
+    local found=0
+
+    echo "--- framebuffer devices ---"
+    ls -l /dev/fb* 2>/dev/null || true
+    for fb in /sys/class/graphics/fb*; do
+        [ -e "$fb" ] || continue
+        found=1
+        echo "${fb##*/}:"
+        for attr in name mode modes virtual_size bits_per_pixel blank state; do
+            [ -r "$fb/$attr" ] || continue
+            printf '  %s=' "$attr"
+            cat "$fb/$attr" 2>/dev/null || true
+        done
+    done
+    [ "$found" -eq 1 ] || echo "no /sys/class/graphics/fb* entries"
+    echo
+}
+
+print_drm_connectors() {
+    local status
+    local found=0
+
+    echo "--- drm connectors ---"
+    for status in /sys/class/drm/card*-*/status; do
+        [ -r "$status" ] || continue
+        found=1
+        printf '%s=' "${status%/status}"
+        cat "$status" 2>/dev/null || true
+    done
+    [ "$found" -eq 1 ] || echo "no connector status entries"
+    echo
+}
+
+write_marker() {
+    mount_esp || return 0
+    mkdir -p "$MARKER_DIR"
+
+    {
+        echo "=== ForgeOS boot diagnostic ==="
+        echo "stage=$STAGE"
+        echo "date=$(date 2>/dev/null || true)"
+        echo "uname=$(uname -a 2>/dev/null || true)"
+        echo "cmdline=$(cat /proc/cmdline 2>/dev/null || true)"
+        echo
+        print_file "proc consoles" /proc/consoles
+        print_file "active console" /sys/class/tty/console/active
+        print_cmd "foreground vt" fgconsole
+        print_cmd "tty devices" ls -l /dev/console /dev/tty /dev/tty0 /dev/tty1 /dev/ttyS0
+        print_cmd "block devices" ls -l /dev/sd* /dev/vd* /dev/nvme* /dev/mmcblk*
+        print_cmd "disk labels" ls -l /dev/disk/by-label /dev/disk/by-partlabel
+        print_cmd "blkid" blkid
+        print_cmd "mounts" cat /proc/mounts
+        print_cmd "drm devices" ls -l /sys/class/drm
+        print_drm_connectors
+        print_framebuffers
+        echo "--- dmesg tail ---"
+        dmesg 2>/dev/null | tail -n 180 || true
+        echo
+    } >> "$MARKER_FILE"
+
+    sync
+    if [ "$MOUNTED_ESP" -eq 1 ]; then
+        umount "$ESP_MOUNT" 2>/dev/null || true
+    fi
+}
+
+try_beep
+try_led_blink
+try_backlight_on
+write_marker
+
+exit 0

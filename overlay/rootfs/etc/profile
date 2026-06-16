@@ -1,0 +1,9 @@
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH
+
+PS1='[forgeos \w]# '
+export PS1
+
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'

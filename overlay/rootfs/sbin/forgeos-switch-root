@@ -1,0 +1,133 @@
+#!/bin/sh
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH
+
+NEWROOT=/newroot
+ROOT_TIMEOUT=${FORGEOS_ROOT_TIMEOUT:-20}
+
+root_fs_type() {
+    awk '$2 == "/" { print $3; exit }' /proc/mounts 2>/dev/null
+}
+
+in_initramfs() {
+    case "$(root_fs_type)" in
+        rootfs|tmpfs)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+console_note() {
+    local tty
+
+    for tty in /dev/tty0 /dev/tty1 /dev/console; do
+        [ -w "$tty" ] || continue
+        printf '%s\n' "$*" > "$tty" 2>/dev/null || true
+    done
+}
+
+find_root_device() {
+    local dev
+    local info
+
+    for dev in /dev/disk/by-partlabel/root /dev/disk/by-label/FORGE_ROOT; do
+        [ -b "$dev" ] || continue
+        printf '%s\n' "$dev"
+        return 0
+    done
+
+    for dev in \
+        /dev/nvme[0-9]n[0-9]p[0-9] \
+        /dev/sd[a-z][0-9] \
+        /dev/mmcblk[0-9]p[0-9] \
+        /dev/vd[a-z][0-9]; do
+        [ -b "$dev" ] || continue
+        info=$(blkid "$dev" 2>/dev/null || true)
+        case "$info" in
+            *' PARTLABEL="root"'*|*' LABEL="FORGE_ROOT"'*)
+                printf '%s\n' "$dev"
+                return 0
+                ;;
+        esac
+    done
+
+    return 1
+}
+
+wait_for_root_device() {
+    local attempt
+    local rootdev
+
+    for attempt in $(seq 1 "$ROOT_TIMEOUT"); do
+        mdev -s 2>/dev/null || true
+        rootdev=$(find_root_device) || true
+        if [ -n "$rootdev" ]; then
+            printf '%s\n' "$rootdev"
+            return 0
+        fi
+        sleep 1
+    done
+
+    return 1
+}
+
+is_mounted_newroot() {
+    grep -q " $NEWROOT " /proc/mounts 2>/dev/null
+}
+
+drop_to_rescue() {
+    local reason=$1
+
+    console_note "ForgeOS switch_root failed: $reason"
+    /sbin/forgeos-bootdiag switch-root-failed || true
+    if [ "$$" -eq 1 ]; then
+        exec /sbin/init
+    fi
+    return 1
+}
+
+if ! grep -qw 'forgeos.switch_root=1' /proc/cmdline 2>/dev/null; then
+    [ "$$" -eq 1 ] && exec /sbin/init
+    exit 0
+fi
+if [ "$$" -ne 1 ]; then
+    console_note "ForgeOS switch_root skipped: helper is not PID 1"
+    exit 1
+fi
+in_initramfs || exec /sbin/init
+
+/sbin/forgeos-bootdiag switch-root-start || true
+console_note "ForgeOS initramfs: locating real root filesystem..."
+
+ROOTDEV=$(wait_for_root_device) || drop_to_rescue "root partition not found" || exit 1
+
+mkdir -p "$NEWROOT"
+mount -t ext4 -o rw "$ROOTDEV" "$NEWROOT" 2>/dev/null || \
+    mount -t ext4 -o ro "$ROOTDEV" "$NEWROOT" 2>/dev/null || \
+    drop_to_rescue "could not mount $ROOTDEV" || exit 1
+
+if ! is_mounted_newroot; then
+    drop_to_rescue "$NEWROOT was not mounted" || exit 1
+fi
+
+if [ ! -x "$NEWROOT/sbin/init" ]; then
+    umount "$NEWROOT" 2>/dev/null || true
+    drop_to_rescue "$ROOTDEV does not contain /sbin/init" || exit 1
+fi
+
+/sbin/forgeos-bootdiag switch-root-exec || true
+console_note "ForgeOS initramfs: switching to $ROOTDEV"
+
+for dir in dev proc sys run; do
+    mkdir -p "$NEWROOT/$dir"
+    mount --move "/$dir" "$NEWROOT/$dir" 2>/dev/null || true
+done
+
+exec switch_root -c /dev/console "$NEWROOT" /sbin/init
+
+drop_to_rescue "switch_root exec returned"
+exit 1

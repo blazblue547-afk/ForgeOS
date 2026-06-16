@@ -1,0 +1,124 @@
+#!/bin/sh
+
+set -u
+
+show_help() {
+    cat <<'EOF'
+Usage: neofetch [--help] [--version]
+
+Print ForgeOS system information with the ForgeOS ASCII logo.
+EOF
+}
+
+case "${1:-}" in
+    --help|-h)
+        show_help
+        exit 0
+        ;;
+    --version|-V)
+        echo "ForgeOS neofetch 1.0"
+        exit 0
+        ;;
+    --*)
+        echo "neofetch: unsupported option: $1" >&2
+        exit 1
+        ;;
+esac
+
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+    reset="$(printf '\033[0m')"
+    bold="$(printf '\033[1m')"
+    logo_color="$(printf '\033[36m')"
+    key_color="$(printf '\033[1;37m')"
+else
+    reset=''
+    bold=''
+    logo_color=''
+    key_color=''
+fi
+
+os_release="${NEOFETCH_OS_RELEASE:-/etc/os-release}"
+host_file="${NEOFETCH_HOSTNAME:-/etc/hostname}"
+desktop_file="${NEOFETCH_DESKTOP_FILE:-/etc/forgeos-desktop}"
+
+os_name="ForgeOS"
+if [ -r "$os_release" ]; then
+    os_name="$(sed -n 's/^PRETTY_NAME=//p' "$os_release" | head -n 1 | sed 's/^"//;s/"$//')"
+    [ -n "$os_name" ] || os_name="$(sed -n 's/^NAME=//p' "$os_release" | head -n 1 | sed 's/^"//;s/"$//')"
+    [ -n "$os_name" ] || os_name="ForgeOS"
+fi
+
+host="$(cat "$host_file" 2>/dev/null || hostname 2>/dev/null || echo forgeos)"
+kernel="$(uname -sr 2>/dev/null || echo unknown)"
+arch="$(uname -m 2>/dev/null || echo unknown)"
+shell_name="${SHELL:-/bin/sh}"
+terminal="${TERM:-linux}"
+init_name="systemd"
+
+desktop="console"
+if [ -r "$desktop_file" ]; then
+    desktop="$(sed -n 's/^NAME=//p' "$desktop_file" | head -n 1 | sed 's/^"//;s/"$//')"
+    [ -n "$desktop" ] || desktop="Openbox"
+fi
+
+uptime_text="unknown"
+if [ -r /proc/uptime ]; then
+    uptime_seconds="$(cut -d. -f1 /proc/uptime 2>/dev/null | awk '{print $1}')"
+    case "$uptime_seconds" in
+        ''|*[!0-9]*)
+            ;;
+        *)
+            days=$((uptime_seconds / 86400))
+            hours=$(((uptime_seconds % 86400) / 3600))
+            mins=$(((uptime_seconds % 3600) / 60))
+            if [ "$days" -gt 0 ]; then
+                uptime_text="${days}d ${hours}h ${mins}m"
+            elif [ "$hours" -gt 0 ]; then
+                uptime_text="${hours}h ${mins}m"
+            else
+                uptime_text="${mins}m"
+            fi
+            ;;
+    esac
+fi
+
+cpu="$arch"
+if [ -r /proc/cpuinfo ]; then
+    cpu="$(sed -n 's/^model name[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | head -n 1)"
+    [ -n "$cpu" ] || cpu="$arch"
+fi
+
+memory="unknown"
+if [ -r /proc/meminfo ]; then
+    mem_total="$(awk '/^MemTotal:/ {print int($2 / 1024)}' /proc/meminfo)"
+    mem_available="$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo)"
+    if [ -n "$mem_total" ] && [ -n "$mem_available" ]; then
+        mem_used=$((mem_total - mem_available))
+        memory="${mem_used}MiB / ${mem_total}MiB"
+    fi
+fi
+
+line() {
+    logo_line="$1"
+    label="$2"
+    value="$3"
+
+    if [ -n "$label" ]; then
+        printf '%b%-37s%b %b%s%b %s\n' "$logo_color" "$logo_line" "$reset" "$key_color" "$label" "$reset" "$value"
+    else
+        printf '%b%s%b\n' "$logo_color" "$logo_line" "$reset"
+    fi
+}
+
+printf '%b%s@%s%b\n' "$bold" "${USER:-root}" "$host" "$reset"
+line '    ______                      ____  _____' 'OS:' "$os_name"
+line '   / ____/___  _________ ____  / __ \/ ___/' 'Host:' "$host"
+line '  / /_  / __ \/ ___/ __ `/ _ \/ / / /\__ \' 'Kernel:' "$kernel"
+line ' / __/ / /_/ / /  / /_/ /  __/ /_/ /__/ /' 'Uptime:' "$uptime_text"
+line '/_/    \____/_/   \__, /\___/\____/____/' 'Shell:' "$shell_name"
+line '                 /____/' 'Terminal:' "$terminal"
+line '                       forged from source' 'Desktop:' "$desktop"
+line '' 'Init:' "$init_name"
+line '' 'CPU:' "$cpu"
+line '' 'Memory:' "$memory"
+line '' 'Packages:' 'overlay + source-built core'

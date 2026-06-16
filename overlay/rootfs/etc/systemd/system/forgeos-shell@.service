@@ -1,0 +1,24 @@
+[Unit]
+Description=ForgeOS root shell on %I
+Documentation=man:systemd.service(5)
+After=systemd-user-sessions.service
+Before=getty.target
+IgnoreOnIsolate=yes
+
+[Service]
+Type=simple
+ExecStart=-/bin/sh -l
+Restart=always
+RestartSec=0
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+KillMode=process
+IgnoreSIGPIPE=no
+SendSIGHUP=yes
+
+[Install]
+WantedBy=getty.target

@@ -1,0 +1,24 @@
+#!/bin/sh
+
+[ -n "$interface" ] || exit 1
+
+case "$1" in
+    deconfig)
+        ip addr flush dev "$interface" 2>/dev/null || true
+        ip route flush dev "$interface" 2>/dev/null || true
+        ;;
+    renew|bound)
+        ifconfig "$interface" 0.0.0.0 2>/dev/null || true
+        ifconfig "$interface" "$ip" netmask "${subnet:-255.255.255.0}" up
+        route del default dev "$interface" 2>/dev/null || true
+        [ -n "${router:-}" ] && route add default gw "$router" dev "$interface" 2>/dev/null || true
+        [ -n "$dns" ] && {
+            : > /etc/resolv.conf
+            for server in $dns; do
+                echo "nameserver $server" >> /etc/resolv.conf
+            done
+        }
+        ;;
+esac
+
+exit 0
