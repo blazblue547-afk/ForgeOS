@@ -9,6 +9,7 @@ As of `2026-06-16`, the project defaults to:
 - D-Bus `1.16.2`
 - BusyBox `1.38.0`
 - Linux-PAM `1.7.2`
+- Nix `2.34.0` as the core package manager
 - `amd64` / `x86_64` only
 - 64-bit only
 - UEFI boot
@@ -44,6 +45,13 @@ make run
 That dependency script is for Debian/Ubuntu hosts and installs only the packages needed for the console rootfs plus direct QEMU boot path. The build path then builds the kernel, Linux-PAM, systemd, D-Bus, BusyBox rescue tools, and a compressed initramfs, then boots it directly in QEMU over serial.
 
 The default console accounts are `forge` and `root`; both use the password `forge`. Console logins go through BusyBox `login`, Linux-PAM, and `pam_systemd.so`, so `systemd-logind` tracks real per-user sessions.
+
+Nix is staged into the normal ForgeOS rootfs as the core package manager. On first boot, `forgeos-nix-bootstrap.service` registers the initial `/nix/store` closure, creates the default Nix profile, and starts `nix-daemon`. Log in as `forge` and install packages with the modern profile command:
+
+```bash
+nix profile install nixpkgs#hello
+hello
+```
 
 To build a UEFI disk image:
 
@@ -106,6 +114,7 @@ sudo make install DISK=/dev/nvme0n1
 - For default direct QEMU testing, `scripts/run-qemu.sh direct` uses the generated `rootfs.cpio.gz`.
 - The host-side installer expands the root partition to fill larger target disks.
 - systemd is installed as `/sbin/init`. BusyBox remains available for `/bin/sh`, PAM-backed `/bin/login`, early switch-root support, and emergency command-line tools.
+- Nix `2.34.0` is staged from the official `x86_64-linux` binary tarball and configured in multi-user daemon mode with `/nix`, `nixbld` build users, `cache.nixos.org`, and `nix-command`/`flakes` enabled. Override `NIX_VERSION` or `NIX_SYSTEM` if you intentionally want a different upstream tarball.
 - A ForgeOS-native `neofetch` command is included in the overlay with a custom ForgeOS ASCII logo at `/usr/share/neofetch/ascii/distro/forgeos`.
 - The console starts PAM-backed login prompts on `tty1` and `ttyS0` through native systemd units instead of BusyBox `inittab`.
 - The system bus is provided by source-built `dbus-daemon` and socket-activated at `/run/dbus/system_bus_socket`.
@@ -149,7 +158,7 @@ Linux-PAM, systemd, and D-Bus are built with Meson/Ninja and staged dynamically.
 - UEFI only for now; BIOS boot is not implemented.
 - The kernel config includes common desktop, laptop, and QEMU storage/input paths, but not every vendor driver.
 - Wireless firmware, GPU acceleration, stock Microsoft-trusted Secure Boot/shim integration, audio, and power-management polish are not bundled yet.
-- There is no package manager yet.
+- Nix is the package manager for the normal ForgeOS rootfs, but ForgeOS does not yet have a declarative NixOS-style system rebuild/update flow.
 - Account management is limited to the built-in `forge` and `root` accounts.
 - The Openbox desktop layer is a staged runtime payload, not an in-OS package manager.
 - The Doom Emacs layer stages the framework and runtime tools, but the per-user Doom package cache is initialized with `doom sync` after first login.

@@ -68,6 +68,9 @@ grep -qx 'CONFIG_LOGIN_SESSION_AS_CHILD=y' "$OUT_DIR/busybox.config" || "$ROOT_D
 [[ -f "$OUT_DIR/bzImage" ]] || "$ROOT_DIR/scripts/build-kernel.sh"
 
 msg "assembling root filesystem"
+if [[ -d "$ROOTFS_STAGING_DIR" ]]; then
+    chmod -R u+w "$ROOTFS_STAGING_DIR" 2>/dev/null || true
+fi
 rm -rf "$ROOTFS_STAGING_DIR"
 mkdir -p "$ROOTFS_STAGING_DIR"
 
@@ -83,6 +86,7 @@ copy_busybox_deps
 
 mkdir -p "$ROOTFS_STAGING_DIR"/{proc,sys,dev,run/dbus,tmp,var/lib/dbus,var/log,root,home/forge,boot,mnt,etc/systemd/system}
 rsync -a "$OVERLAY_DIR"/ "$ROOTFS_STAGING_DIR"/
+"$ROOT_DIR/scripts/stage-nix.sh"
 
 rm -f "$ROOTFS_STAGING_DIR/sbin/init"
 ln -s ../usr/lib/systemd/systemd "$ROOTFS_STAGING_DIR/sbin/init"
@@ -132,6 +136,12 @@ ln -sfn /usr/lib/systemd/system/systemd-udevd-control.socket \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/sockets.target.wants/systemd-udevd-control.socket"
 ln -sfn /usr/lib/systemd/system/systemd-udevd-kernel.socket \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/sockets.target.wants/systemd-udevd-kernel.socket"
+ln -sfn /etc/systemd/system/forgeos-nix-bootstrap.service \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/sysinit.target.wants/forgeos-nix-bootstrap.service"
+ln -sfn /etc/systemd/system/nix-daemon.service \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/nix-daemon.service"
+ln -sfn /etc/systemd/system/nix-daemon.socket \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/sockets.target.wants/nix-daemon.socket"
 
 ln -sfn /dev/null "$ROOTFS_STAGING_DIR/etc/systemd/system/autovt@.service"
 ln -sfn /dev/null "$ROOTFS_STAGING_DIR/etc/systemd/system/getty@tty1.service"
@@ -155,6 +165,7 @@ chmod 755 \
     "$ROOTFS_STAGING_DIR/sbin/forgeos-bootdiag" \
     "$ROOTFS_STAGING_DIR/sbin/forgeos-console-banner" \
     "$ROOTFS_STAGING_DIR/sbin/forgeos-switch-root" \
+    "$ROOTFS_STAGING_DIR/usr/lib/forgeos/nix-bootstrap" \
     "$ROOTFS_STAGING_DIR/usr/bin/neofetch" \
     "$ROOTFS_STAGING_DIR/usr/share/udhcpc/default.script"
 chmod 700 "$ROOTFS_STAGING_DIR/root" "$ROOTFS_STAGING_DIR/home/forge"

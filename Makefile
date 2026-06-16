@@ -6,6 +6,8 @@ export BUSYBOX_VERSION ?= 1.38.0
 export SYSTEMD_VERSION ?= 260
 export DBUS_VERSION ?= 1.16.2
 export PAM_VERSION ?= 1.7.2
+export NIX_VERSION ?= 2.34.0
+export NIX_SYSTEM ?= x86_64-linux
 export DESKTOP ?= console
 export ENABLE_DESKTOP ?= 0
 export ENABLE_DOOM_EMACS ?= 0
@@ -13,7 +15,7 @@ export ROOT_LABEL ?= FORGE_ROOT
 export EFI_LABEL ?= FORGE_EFI
 desktop_enabled := $(filter 1 true TRUE yes YES on ON,$(ENABLE_DESKTOP))
 doom_emacs_enabled := $(filter 1 true TRUE yes YES on ON,$(ENABLE_DOOM_EMACS))
-export IMAGE_SIZE_MIB ?= $(if $(filter gnome,$(DESKTOP)),12288,$(if $(or $(desktop_enabled),$(doom_emacs_enabled)),4096,2048))
+export IMAGE_SIZE_MIB ?= $(if $(filter gnome,$(DESKTOP)),12288,$(if $(or $(desktop_enabled),$(doom_emacs_enabled)),6144,4096))
 export ESP_SIZE_MIB ?= 256
 export JOBS ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
 export SECURE_BOOT ?= 0
@@ -36,6 +38,7 @@ help:
 		'  make systemd    - build systemd PID 1' \
 		'  make dbus       - build the D-Bus system bus daemon' \
 		'  make rootfs     - assemble the systemd rootfs and initramfs' \
+		'  make rootfs includes Nix as the core package manager' \
 		'  ENABLE_DESKTOP=1 make rootfs - add Openbox/tint2/PCManFM desktop' \
 		'  ENABLE_DOOM_EMACS=1 make rootfs - add Emacs + Doom Emacs tooling' \
 		'  make doom-emacs - rebuild rootfs with the Doom Emacs layer enabled' \

@@ -9,6 +9,7 @@ ForgeOS defaults to a CLI-only operating system for `x86_64` desktops and laptop
 - D-Bus for the system message bus
 - Linux-PAM for local login authentication and session hooks
 - BusyBox for `/bin/sh`, early switch-root support, and compact rescue tools
+- Nix for core package management
 - optional Doom Emacs tooling for an editor-focused user environment
 - custom units and configuration files from this repository
 
@@ -39,10 +40,13 @@ The root filesystem is assembled in `staging/rootfs` from:
 - Linux-PAM install output from `staging/pam`
 - runtime library dependencies copied from the native build host for systemd, D-Bus, PAM, and BusyBox binaries
 - BusyBox install output for shell and rescue utilities
+- the official Nix `x86_64-linux` binary tarball staged into `/nix/store`
 - kernel modules from the kernel build
 - the repository overlay in `overlay/rootfs`
 
 The default network path uses DHCP through `systemd-networkd`. DNS servers learned from DHCP are exposed through `systemd-resolved`, and `/etc/resolv.conf` is a symlink to the resolved-managed compatibility file at `/run/systemd/resolve/resolv.conf`. Tools that query systemd over D-Bus use the system bus at `/run/dbus/system_bus_socket`. The source-built systemd layer also includes `systemd-logind`, `loginctl`, `pam_systemd.so`, the `org.freedesktop.login1` system-bus policy, and the logind varlink socket. Console login uses BusyBox `getty` and `login`; `/etc/pam.d/login` authenticates against `/etc/shadow` with `pam_unix.so` and registers sessions with `pam_systemd.so`.
+
+Nix is integrated as a multi-user daemon package manager in the normal ForgeOS rootfs. `scripts/stage-nix.sh` copies the official Nix store closure into `/nix/store`, stages `nix.conf`, adds `nixbld` build accounts, enables `forgeos-nix-bootstrap.service`, and exposes `nix-daemon.service` plus `nix-daemon.socket`. On first boot, the bootstrap service fixes `/nix` ownership, loads the bundled `.reginfo` into the Nix database, and creates the default profile with Nix, Nix manual pages, and the bundled CA certificate package. ForgeOS enables `nix-command` and `flakes`, uses `cache.nixos.org`, and leaves Nix build sandboxing disabled until the OS has a verified sandbox policy.
 
 The default console build also generates `out/rootfs.cpio.gz` for quick QEMU smoke tests. Desktop-enabled rootfs builds skip the initramfs artifact and boot through the ext4 root partition image.
 
@@ -91,7 +95,7 @@ This is enough for a first CLI OS image and a development boot path, but not yet
 - Microsoft/shim-signed Secure Boot chain
 - measured boot and full verified boot
 - full laptop Wi-Fi and firmware coverage
-- package management
+- declarative NixOS-style system rebuilds and rollback management
 - pre-synced per-user Doom Emacs package caches
 - source-built GNOME and graphical desktop dependency closure
 - source-built Openbox/Xorg/GTK graphical dependency closure
@@ -104,5 +108,5 @@ This is enough for a first CLI OS image and a development boot path, but not yet
 
 1. Add a source-built libc and dependency sysroot so systemd no longer needs copied host libraries.
 2. Teach the installer to support target-specific kernel command lines so multiple ForgeOS disks can coexist more safely.
-3. Add network profiles, SSH, and a package/update mechanism.
+3. Add network profiles, SSH, and a ForgeOS system update mechanism on top of Nix.
 4. Expand kernel coverage for Wi-Fi, Bluetooth, audio, suspend, and vendor input devices.

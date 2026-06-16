@@ -12,9 +12,9 @@ if [[ "$DESKTOP" == "gnome" ]]; then
     [[ -d "$ROOTFS_STAGING_DIR" && -f "$ROOTFS_STAGING_DIR/etc/gdm3/daemon.conf" ]] || "$ROOT_DIR/scripts/build-gnome-rootfs.sh"
 else
     if truthy "$ENABLE_DESKTOP"; then
-        [[ -d "$ROOTFS_STAGING_DIR" && -f "$ROOTFS_STAGING_DIR/etc/forgeos-desktop" ]] || "$ROOT_DIR/scripts/build-rootfs.sh"
+        [[ -d "$ROOTFS_STAGING_DIR" && -f "$ROOTFS_STAGING_DIR/etc/forgeos-desktop" && -f "$ROOTFS_STAGING_DIR/etc/forgeos-nix" ]] || "$ROOT_DIR/scripts/build-rootfs.sh"
     else
-        [[ -d "$ROOTFS_STAGING_DIR" ]] || "$ROOT_DIR/scripts/build-rootfs.sh"
+        [[ -d "$ROOTFS_STAGING_DIR" && -f "$ROOTFS_STAGING_DIR/etc/forgeos-nix" ]] || "$ROOT_DIR/scripts/build-rootfs.sh"
         [[ -f "$OUT_DIR/rootfs.cpio.gz" ]] || "$ROOT_DIR/scripts/build-rootfs.sh"
     fi
 fi

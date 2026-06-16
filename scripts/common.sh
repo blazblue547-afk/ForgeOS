@@ -16,6 +16,8 @@ BUSYBOX_VERSION=${BUSYBOX_VERSION:-1.38.0}
 SYSTEMD_VERSION=${SYSTEMD_VERSION:-260}
 DBUS_VERSION=${DBUS_VERSION:-1.16.2}
 PAM_VERSION=${PAM_VERSION:-1.7.2}
+NIX_VERSION=${NIX_VERSION:-2.34.0}
+NIX_SYSTEM=${NIX_SYSTEM:-x86_64-linux}
 DESKTOP=${DESKTOP:-console}
 ENABLE_DESKTOP=${ENABLE_DESKTOP:-0}
 ENABLE_DOOM_EMACS=${ENABLE_DOOM_EMACS:-0}
@@ -32,9 +34,9 @@ if [[ -z "${IMAGE_SIZE_MIB:-}" ]]; then
     if [[ "$DESKTOP" == "gnome" ]]; then
         IMAGE_SIZE_MIB=12288
     elif [[ "$ENABLE_DESKTOP" =~ ^(1|true|TRUE|yes|YES|on|ON)$ || "$ENABLE_DOOM_EMACS" =~ ^(1|true|TRUE|yes|YES|on|ON)$ ]]; then
-        IMAGE_SIZE_MIB=4096
+        IMAGE_SIZE_MIB=6144
     else
-        IMAGE_SIZE_MIB=2048
+        IMAGE_SIZE_MIB=4096
     fi
 fi
 ESP_SIZE_MIB=${ESP_SIZE_MIB:-256}
@@ -59,6 +61,8 @@ DBUS_TARBALL="dbus-${DBUS_VERSION}.tar.xz"
 DBUS_URL="https://dbus.freedesktop.org/releases/dbus/${DBUS_TARBALL}"
 PAM_TARBALL="linux-pam-${PAM_VERSION}.tar.gz"
 PAM_URL="https://github.com/linux-pam/linux-pam/archive/refs/tags/v${PAM_VERSION}.tar.gz"
+NIX_TARBALL="nix-${NIX_VERSION}-${NIX_SYSTEM}.tar.xz"
+NIX_URL="https://releases.nixos.org/nix/nix-${NIX_VERSION}/${NIX_TARBALL}"
 GNOME_SUITE=${GNOME_SUITE:-trixie}
 GNOME_MIRROR=${GNOME_MIRROR:-http://deb.debian.org/debian}
 DOOM_EMACS_GIT_URL=${DOOM_EMACS_GIT_URL:-https://github.com/doomemacs/doomemacs.git}
@@ -73,6 +77,7 @@ BUSYBOX_SRC_DIR="$SOURCE_DIR/busybox-${BUSYBOX_VERSION}"
 SYSTEMD_SRC_DIR="$SOURCE_DIR/systemd-${SYSTEMD_VERSION}"
 DBUS_SRC_DIR="$SOURCE_DIR/dbus-${DBUS_VERSION}"
 PAM_SRC_DIR="$SOURCE_DIR/linux-pam-${PAM_VERSION}"
+NIX_SRC_DIR="$SOURCE_DIR/nix-${NIX_VERSION}-${NIX_SYSTEM}"
 KERNEL_BUILD_DIR="$BUILD_DIR/linux-${KERNEL_VERSION}"
 BUSYBOX_BUILD_DIR="$BUILD_DIR/busybox-${BUSYBOX_VERSION}"
 SYSTEMD_BUILD_DIR="$BUILD_DIR/systemd-${SYSTEMD_VERSION}"
