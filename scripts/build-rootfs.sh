@@ -4,6 +4,54 @@ set -euo pipefail
 
 source "$(dirname "$0")/common.sh"
 
+copy_runtime_dep() {
+    local dep=$1
+    local dest
+
+    [[ -e "$dep" ]] || return 0
+    case "$dep" in
+        "$PAM_STAGING_DIR"/*)
+            dest="$ROOTFS_STAGING_DIR/${dep#"$PAM_STAGING_DIR"/}"
+            ;;
+        "$ROOTFS_STAGING_DIR"/*)
+            dest="$dep"
+            ;;
+        "$SYSTEMD_STAGING_DIR"/*)
+            dest="$ROOTFS_STAGING_DIR/${dep#"$SYSTEMD_STAGING_DIR"/}"
+            ;;
+        "$DBUS_STAGING_DIR"/*)
+            dest="$ROOTFS_STAGING_DIR/${dep#"$DBUS_STAGING_DIR"/}"
+            ;;
+        *)
+            dest="$ROOTFS_STAGING_DIR$dep"
+            ;;
+    esac
+
+    [[ -e "$dest" ]] && return 0
+    mkdir -p "$(dirname "$dest")"
+    install -Dm755 "$dep" "$dest"
+}
+
+copy_busybox_deps() {
+    local line dep
+
+    LD_LIBRARY_PATH="$ROOTFS_STAGING_DIR/usr/lib:$PAM_STAGING_DIR/usr/lib:$SYSTEMD_STAGING_DIR/usr/lib:$DBUS_STAGING_DIR/usr/lib:${LD_LIBRARY_PATH:-}" ldd "$BUSYBOX_BUILD_DIR/busybox" 2>/dev/null | while IFS= read -r line; do
+        dep=
+        case "$line" in
+            *"=>"*"/"*)
+                dep=${line#*=> }
+                dep=${dep%% *}
+                ;;
+            [[:space:]]/*)
+                dep=${line#"${line%%[![:space:]]*}"}
+                dep=${dep%% *}
+                ;;
+        esac
+        [[ -n "${dep:-}" && "$dep" = /* ]] || continue
+        copy_runtime_dep "$dep"
+    done
+}
+
 if [[ "$DESKTOP" == "gnome" ]]; then
     exec "$ROOT_DIR/scripts/build-gnome-rootfs.sh"
 fi
@@ -11,8 +59,11 @@ fi
 require_cmd make rsync cpio gzip
 ensure_dirs
 
-[[ -x "$BUSYBOX_BUILD_DIR/busybox" ]] || "$ROOT_DIR/scripts/build-busybox.sh"
-[[ -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd" && -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd-logind" && -f "$SYSTEMD_STAGING_DIR/.forgeos-systemd-complete" ]] || "$ROOT_DIR/scripts/build-systemd.sh"
+[[ -f "$PAM_STAGING_DIR/.forgeos-pam-complete" ]] || "$ROOT_DIR/scripts/build-pam.sh"
+[[ -x "$BUSYBOX_BUILD_DIR/busybox" && -f "$OUT_DIR/busybox.config" ]] || "$ROOT_DIR/scripts/build-busybox.sh"
+grep -qx 'CONFIG_PAM=y' "$OUT_DIR/busybox.config" || "$ROOT_DIR/scripts/build-busybox.sh"
+grep -qx 'CONFIG_LOGIN_SESSION_AS_CHILD=y' "$OUT_DIR/busybox.config" || "$ROOT_DIR/scripts/build-busybox.sh"
+[[ -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd" && -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd-logind" && -f "$SYSTEMD_STAGING_DIR/usr/lib/security/pam_systemd.so" && -f "$SYSTEMD_STAGING_DIR/.forgeos-systemd-complete" ]] || "$ROOT_DIR/scripts/build-systemd.sh"
 [[ -x "$DBUS_STAGING_DIR/usr/bin/dbus-daemon" && -f "$DBUS_STAGING_DIR/.forgeos-dbus-complete" ]] || "$ROOT_DIR/scripts/build-dbus.sh"
 [[ -f "$OUT_DIR/bzImage" ]] || "$ROOT_DIR/scripts/build-kernel.sh"
 
@@ -20,17 +71,24 @@ msg "assembling root filesystem"
 rm -rf "$ROOTFS_STAGING_DIR"
 mkdir -p "$ROOTFS_STAGING_DIR"
 
-make -C "$BUSYBOX_SRC_DIR" O="$BUSYBOX_BUILD_DIR" CONFIG_PREFIX="$ROOTFS_STAGING_DIR" install
+make -C "$BUSYBOX_SRC_DIR" O="$BUSYBOX_BUILD_DIR" \
+    CONFIG_PREFIX="$ROOTFS_STAGING_DIR" \
+    EXTRA_CFLAGS="-I$PAM_STAGING_DIR/usr/include" \
+    EXTRA_LDFLAGS="-L$PAM_STAGING_DIR/usr/lib" \
+    install
+rsync -a "$PAM_STAGING_DIR"/ "$ROOTFS_STAGING_DIR"/
 rsync -a "$SYSTEMD_STAGING_DIR"/ "$ROOTFS_STAGING_DIR"/
 rsync -a "$DBUS_STAGING_DIR"/ "$ROOTFS_STAGING_DIR"/
+copy_busybox_deps
 
-mkdir -p "$ROOTFS_STAGING_DIR"/{proc,sys,dev,run/dbus,tmp,var/lib/dbus,var/log,root,boot,mnt,etc/systemd/system}
+mkdir -p "$ROOTFS_STAGING_DIR"/{proc,sys,dev,run/dbus,tmp,var/lib/dbus,var/log,root,home/forge,boot,mnt,etc/systemd/system}
 rsync -a "$OVERLAY_DIR"/ "$ROOTFS_STAGING_DIR"/
 
 rm -f "$ROOTFS_STAGING_DIR/sbin/init"
 ln -s ../usr/lib/systemd/systemd "$ROOTFS_STAGING_DIR/sbin/init"
 ln -sfn ../../sbin/modprobe "$ROOTFS_STAGING_DIR/usr/bin/modprobe"
 ln -sfn ../run/systemd/resolve/resolv.conf "$ROOTFS_STAGING_DIR/etc/resolv.conf"
+ln -sfn ../run "$ROOTFS_STAGING_DIR/var/run"
 
 mkdir -p \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/getty.target.wants" \
@@ -40,10 +98,10 @@ mkdir -p \
 
 ln -sfn /usr/lib/systemd/system/multi-user.target \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/default.target"
-ln -sfn /etc/systemd/system/forgeos-shell@.service \
-    "$ROOTFS_STAGING_DIR/etc/systemd/system/getty.target.wants/forgeos-shell@tty1.service"
-ln -sfn /etc/systemd/system/forgeos-shell@.service \
-    "$ROOTFS_STAGING_DIR/etc/systemd/system/getty.target.wants/forgeos-shell@ttyS0.service"
+ln -sfn /etc/systemd/system/forgeos-login@.service \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/getty.target.wants/forgeos-login@tty1.service"
+ln -sfn /etc/systemd/system/forgeos-login@.service \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/getty.target.wants/forgeos-login@ttyS0.service"
 ln -sfn /etc/systemd/system/forgeos-bootdiag.service \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/forgeos-bootdiag.service"
 ln -sfn /etc/systemd/system/forgeos-console-banner.service \
@@ -95,6 +153,10 @@ chmod 755 \
     "$ROOTFS_STAGING_DIR/sbin/forgeos-switch-root" \
     "$ROOTFS_STAGING_DIR/usr/bin/neofetch" \
     "$ROOTFS_STAGING_DIR/usr/share/udhcpc/default.script"
+chmod 700 "$ROOTFS_STAGING_DIR/root" "$ROOTFS_STAGING_DIR/home/forge"
+chown 1000:1000 "$ROOTFS_STAGING_DIR/home/forge"
+[[ ! -f "$ROOTFS_STAGING_DIR/etc/shadow" ]] || chmod 600 "$ROOTFS_STAGING_DIR/etc/shadow"
+[[ ! -f "$ROOTFS_STAGING_DIR/etc/gshadow" ]] || chmod 600 "$ROOTFS_STAGING_DIR/etc/gshadow"
 
 find "$ROOTFS_STAGING_DIR" -printf '%P\n' | LC_ALL=C sort > "$OUT_DIR/rootfs.manifest"
 

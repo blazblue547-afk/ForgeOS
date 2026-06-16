@@ -10,13 +10,21 @@ ensure_dirs
 [[ -z "$CROSS_COMPILE" ]] || die "systemd rootfs staging currently requires a native build; CROSS_COMPILE is not supported"
 [[ "$ARCH" == "x86_64" ]] || die "systemd rootfs staging currently supports ARCH=x86_64 only"
 [[ -d "$SYSTEMD_SRC_DIR" ]] || "$ROOT_DIR/scripts/fetch-sources.sh"
+[[ -f "$PAM_STAGING_DIR/.forgeos-pam-complete" && -f "$PAM_BUILD_DIR/pkgconfig/pam.pc" ]] || "$ROOT_DIR/scripts/build-pam.sh"
 
 copy_runtime_dep() {
     local dep=$1
     local dest
 
     [[ -e "$dep" ]] || return 0
-    dest="$SYSTEMD_STAGING_DIR$dep"
+    case "$dep" in
+        "$PAM_STAGING_DIR"/*)
+            dest="$SYSTEMD_STAGING_DIR/${dep#"$PAM_STAGING_DIR"/}"
+            ;;
+        *)
+            dest="$SYSTEMD_STAGING_DIR$dep"
+            ;;
+    esac
     mkdir -p "$(dirname "$dest")"
     install -Dm755 "$dep" "$dest"
 }
@@ -25,7 +33,7 @@ copy_elf_deps() {
     local elf=$1
     local line dep
 
-    ldd "$elf" 2>/dev/null | while IFS= read -r line; do
+    LD_LIBRARY_PATH="$PAM_STAGING_DIR/usr/lib:${LD_LIBRARY_PATH:-}" ldd "$elf" 2>/dev/null | while IFS= read -r line; do
         dep=
         case "$line" in
             *"=>"*"/"*)
@@ -57,6 +65,8 @@ msg "configuring systemd ${SYSTEMD_VERSION}"
 rm -rf "$SYSTEMD_BUILD_DIR" "$SYSTEMD_STAGING_DIR"
 mkdir -p "$SYSTEMD_BUILD_DIR" "$SYSTEMD_STAGING_DIR"
 
+PKG_CONFIG_PATH="$PAM_BUILD_DIR/pkgconfig:${PKG_CONFIG_PATH:-}" \
+LD_LIBRARY_PATH="$PAM_STAGING_DIR/usr/lib:${LD_LIBRARY_PATH:-}" \
 meson setup "$SYSTEMD_BUILD_DIR" "$SYSTEMD_SRC_DIR" \
     --prefix=/usr \
     --libdir=lib \
@@ -112,6 +122,8 @@ meson setup "$SYSTEMD_BUILD_DIR" "$SYSTEMD_SRC_DIR" \
     -Dmountfsd=false \
     -Duserdb=false \
     -Dhomed=disabled \
+    -Dpamlibdir=/usr/lib/security \
+    -Dpamconfdir=/etc/pam.d \
     -Dnetworkd=true \
     -Ddefault-network=false \
     -Dtimedated=false \
@@ -143,7 +155,7 @@ meson setup "$SYSTEMD_BUILD_DIR" "$SYSTEMD_SRC_DIR" \
     -Daudit=disabled \
     -Dfdisk=disabled \
     -Dkmod=disabled \
-    -Dpam=disabled \
+    -Dpam=enabled \
     -Dpasswdqc=disabled \
     -Dpwquality=disabled \
     -Dmicrohttpd=disabled \
@@ -179,9 +191,11 @@ meson setup "$SYSTEMD_BUILD_DIR" "$SYSTEMD_SRC_DIR" \
     -Ddefault-user-shell=/bin/sh
 
 msg "building systemd ${SYSTEMD_VERSION}"
+LD_LIBRARY_PATH="$PAM_STAGING_DIR/usr/lib:${LD_LIBRARY_PATH:-}" \
 meson compile -C "$SYSTEMD_BUILD_DIR" -j "$JOBS"
 
 msg "installing systemd ${SYSTEMD_VERSION}"
+LD_LIBRARY_PATH="$PAM_STAGING_DIR/usr/lib:${LD_LIBRARY_PATH:-}" \
 DESTDIR="$SYSTEMD_STAGING_DIR" meson install -C "$SYSTEMD_BUILD_DIR" --no-rebuild
 
 msg "copying systemd runtime library dependencies"
@@ -197,6 +211,8 @@ copy_named_library libmount.so.1
 [[ -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd" ]] || die "systemd binary was not installed"
 [[ -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd-logind" ]] || die "systemd-logind binary was not installed"
 [[ -x "$SYSTEMD_STAGING_DIR/usr/bin/loginctl" ]] || die "loginctl binary was not installed"
+[[ -f "$SYSTEMD_STAGING_DIR/usr/lib/security/pam_systemd.so" ]] || die "pam_systemd module was not installed"
+[[ -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd-user-runtime-dir" ]] || die "systemd-user-runtime-dir was not installed"
 [[ -f "$SYSTEMD_STAGING_DIR/usr/share/dbus-1/system.d/org.freedesktop.login1.conf" ]] || die "logind D-Bus policy was not installed"
 touch "$SYSTEMD_STAGING_DIR/.forgeos-systemd-complete"
 msg "systemd staging tree: $SYSTEMD_STAGING_DIR"

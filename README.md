@@ -8,6 +8,7 @@ As of `2026-06-16`, the project defaults to:
 - systemd `260`
 - D-Bus `1.16.2`
 - BusyBox `1.38.0`
+- Linux-PAM `1.7.2`
 - `amd64` / `x86_64` only
 - 64-bit only
 - UEFI boot
@@ -39,7 +40,9 @@ make rootfs
 make run
 ```
 
-That dependency script is for Debian/Ubuntu hosts and installs only the packages needed for the console rootfs plus direct QEMU boot path. The build path then builds the kernel, systemd, D-Bus, BusyBox rescue tools, and a compressed initramfs, then boots it directly in QEMU over serial.
+That dependency script is for Debian/Ubuntu hosts and installs only the packages needed for the console rootfs plus direct QEMU boot path. The build path then builds the kernel, Linux-PAM, systemd, D-Bus, BusyBox rescue tools, and a compressed initramfs, then boots it directly in QEMU over serial.
+
+The default console accounts are `forge` and `root`; both use the password `forge`. Console logins go through BusyBox `login`, Linux-PAM, and `pam_systemd.so`, so `systemd-logind` tracks real per-user sessions.
 
 To build a UEFI disk image:
 
@@ -58,7 +61,7 @@ ENABLE_DESKTOP=1 make image
 ENABLE_DESKTOP=1 make run-desktop
 ```
 
-This keeps the regular ForgeOS rootfs path and stages Openbox, tint2, PCManFM, Xorg, fonts, icons, and a terminal into it. The serial root shell remains on `ttyS0`; `tty1` starts the desktop session.
+This keeps the regular ForgeOS rootfs path and stages Openbox, tint2, PCManFM, Xorg, fonts, icons, and a terminal into it. The serial login prompt remains on `ttyS0`; `tty1` starts the desktop session.
 
 To build a GNOME desktop image, install `mmdebstrap` on the host and use the GNOME targets:
 
@@ -86,16 +89,16 @@ sudo make install DISK=/dev/nvme0n1
 
 ## Build Notes
 
-- The root filesystem is not copied from a distro. It is assembled from upstream systemd, upstream D-Bus, upstream BusyBox rescue tools, copied runtime library dependencies for systemd and D-Bus, and the files in `overlay/rootfs/`.
+- The root filesystem is not copied from a distro. It is assembled from upstream systemd, upstream D-Bus, upstream Linux-PAM, upstream BusyBox rescue tools, copied runtime library dependencies for systemd, D-Bus, PAM, and BusyBox, and the files in `overlay/rootfs/`.
 - The default removable-media boot path uses GRUB at `EFI/BOOT/BOOTX64.EFI` and keeps the kernel EFI stub at `EFI/BOOT/FORGEOS.EFI`.
 - The built-in kernel command line targets `PARTLABEL=root` and keeps Intel graphics modesetting enabled, with a couple of laptop display workarounds for newer firmware.
 - For default direct QEMU testing, `scripts/run-qemu.sh direct` uses the generated `rootfs.cpio.gz`.
 - The host-side installer expands the root partition to fill larger target disks.
-- systemd is installed as `/sbin/init`. BusyBox remains available for `/bin/sh`, early switch-root support, and emergency command-line tools.
+- systemd is installed as `/sbin/init`. BusyBox remains available for `/bin/sh`, PAM-backed `/bin/login`, early switch-root support, and emergency command-line tools.
 - A ForgeOS-native `neofetch` command is included in the overlay with a custom ForgeOS ASCII logo at `/usr/share/neofetch/ascii/distro/forgeos`.
-- The console starts an immediate root shell on `tty1` and `ttyS0` through native systemd units instead of BusyBox `inittab`.
+- The console starts PAM-backed login prompts on `tty1` and `ttyS0` through native systemd units instead of BusyBox `inittab`.
 - The system bus is provided by source-built `dbus-daemon` and socket-activated at `/run/dbus/system_bus_socket`.
-- `systemd-logind` is included in the source-built systemd layer, owns `org.freedesktop.login1` on the system bus, and provides `loginctl` plus the logind varlink socket.
+- `systemd-logind` is included in the source-built systemd layer, owns `org.freedesktop.login1` on the system bus, and provides `loginctl` plus the logind varlink socket. `pam_systemd.so` registers console logins as logind sessions.
 - DHCP networking is handled by `systemd-networkd`; DNS is handled by `systemd-resolved`, with `/etc/resolv.conf` linked to `/run/systemd/resolve/resolv.conf`.
 - `ENABLE_DESKTOP=1` adds an Openbox/tint2/PCManFM desktop layer to the normal ForgeOS rootfs by extracting a minimal Debian package payload while preserving the source-built systemd and D-Bus daemons.
 - `DESKTOP=gnome` switches rootfs assembly to a Debian package bootstrap because GNOME depends on a large desktop stack that ForgeOS does not source-build yet.
@@ -127,21 +130,7 @@ The host needs `sbsign` for signed builds. Enroll `out/secure-boot/ForgeOS.cer` 
 
 ## Toolchain Notes
 
-BusyBox is configured as a static rescue binary by default. If the host toolchain does not provide static libc support, use a musl-capable compiler for the BusyBox part, for example:
-
-```bash
-cd /home/joe/forgeos
-CC=musl-gcc make rootfs
-```
-
-or:
-
-```bash
-cd /home/joe/forgeos
-CROSS_COMPILE=x86_64-linux-musl- make rootfs
-```
-
-systemd and D-Bus are built with Meson/Ninja and staged dynamically. The build copies the ELF runtime library closure from the native build host into the root filesystem, so cross-building the systemd userspace is not supported yet.
+Linux-PAM, systemd, and D-Bus are built with Meson/Ninja and staged dynamically. BusyBox is also built dynamically so its `login` applet can load PAM modules. The build copies the ELF runtime library closure from the native build host into the root filesystem, so cross-building the userspace is not supported yet.
 
 ## Current Limits
 
@@ -149,6 +138,7 @@ systemd and D-Bus are built with Meson/Ninja and staged dynamically. The build c
 - The kernel config includes common desktop, laptop, and QEMU storage/input paths, but not every vendor driver.
 - Wireless firmware, GPU acceleration, stock Microsoft-trusted Secure Boot/shim integration, audio, and power-management polish are not bundled yet.
 - There is no package manager yet.
+- Account management is limited to the built-in `forge` and `root` accounts.
 - The Openbox desktop layer is a staged runtime payload, not an in-OS package manager.
 - GNOME support is currently a package-bootstrapped desktop flavor, not a source-built ForgeOS desktop stack.
 - The installer is host-side only; there is no in-OS guided installer yet.

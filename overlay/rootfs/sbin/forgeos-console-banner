@@ -8,7 +8,7 @@ for tty in /dev/tty0 /dev/tty1 /dev/ttyS0 /dev/console; do
     {
         echo
         echo "ForgeOS boot complete: $(uname -r) on $(uname -m)"
-        echo "Root shell is available on tty1 and ttyS0."
+        echo "Login prompts are available on tty1 and ttyS0."
         echo
     } > "$tty" 2>/dev/null || true
 done

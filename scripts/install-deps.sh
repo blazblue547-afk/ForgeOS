@@ -30,6 +30,7 @@ packages=(
     perl
     kmod
     openssl
+    libcrypt-dev
     libcap-dev
     libmount-dev
     libblkid-dev

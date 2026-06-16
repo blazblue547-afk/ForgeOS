@@ -185,7 +185,7 @@ EOF
 Description=ForgeOS Openbox desktop
 Wants=dbus.service systemd-logind.service systemd-udevd.service
 After=dbus.service systemd-logind.service systemd-udevd.service systemd-user-sessions.service
-Conflicts=forgeos-shell@tty1.service getty@tty1.service
+Conflicts=forgeos-login@tty1.service forgeos-shell@tty1.service getty@tty1.service
 
 [Service]
 Type=simple
@@ -212,6 +212,7 @@ EOF
 
     ln -sfn /etc/systemd/system/forgeos-desktop.service \
         "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/forgeos-desktop.service"
+    rm -f "$ROOTFS_STAGING_DIR/etc/systemd/system/getty.target.wants/forgeos-login@tty1.service"
     rm -f "$ROOTFS_STAGING_DIR/etc/systemd/system/getty.target.wants/forgeos-shell@tty1.service"
 
     if [[ -e "$ROOTFS_STAGING_DIR/usr/lib/systemd/system/dbus.socket" ]]; then

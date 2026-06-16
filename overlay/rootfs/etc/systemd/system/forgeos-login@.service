@@ -1,0 +1,26 @@
+[Unit]
+Description=ForgeOS login prompt on %I
+Documentation=man:systemd.service(5)
+Wants=systemd-logind.service
+After=systemd-logind.service systemd-user-sessions.service getty-pre.target
+Before=getty.target
+ConditionPathExists=/dev/%I
+IgnoreOnIsolate=yes
+
+[Service]
+ExecStart=-/sbin/getty -L 0 %I linux
+Type=idle
+Restart=always
+RestartSec=0
+UtmpIdentifier=%I
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+IgnoreSIGPIPE=no
+SendSIGHUP=yes
+
+[Install]
+WantedBy=getty.target

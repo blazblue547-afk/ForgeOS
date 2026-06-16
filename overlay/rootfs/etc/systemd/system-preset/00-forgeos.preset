@@ -1,6 +1,6 @@
 disable *
-enable forgeos-shell@tty1.service
-enable forgeos-shell@ttyS0.service
+enable forgeos-login@tty1.service
+enable forgeos-login@ttyS0.service
 enable forgeos-bootdiag.service
 enable forgeos-console-banner.service
 enable dbus.service

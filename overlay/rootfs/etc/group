@@ -1,9 +1,14 @@
 root:x:0:
 tty:x:5:
 disk:x:6:
+audio:x:29:forge
 utmp:x:43:
+video:x:44:forge
 messagebus:x:81:
+users:x:100:forge
+input:x:104:forge
 systemd-journal:x:190:
 systemd-network:x:192:
 systemd-resolve:x:193:
+forge:x:1000:
 nobody:x:65534:

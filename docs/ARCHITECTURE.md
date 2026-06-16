@@ -7,6 +7,7 @@ ForgeOS defaults to a CLI-only operating system for `x86_64` desktops and laptop
 - Linux kernel for the kernel layer
 - systemd for PID 1 and service supervision
 - D-Bus for the system message bus
+- Linux-PAM for local login authentication and session hooks
 - BusyBox for `/bin/sh`, early switch-root support, and compact rescue tools
 - custom units and configuration files from this repository
 
@@ -24,7 +25,7 @@ ForgeOS currently targets UEFI systems.
 4. The built kernel EFI stub is copied to `EFI/BOOT/FORGEOS.EFI`.
 5. UEFI firmware executes GRUB from `EFI/BOOT/BOOTX64.EFI`, and GRUB starts the kernel.
 6. The built-in kernel command line mounts `PARTLABEL=root` as the real root filesystem.
-7. systemd starts as `/sbin/init`, activates the D-Bus system bus, starts `systemd-logind`, `systemd-resolved`, and `systemd-networkd`, reaches `multi-user.target`, and launches ForgeOS root-shell services on `tty1` and `ttyS0`.
+7. systemd starts as `/sbin/init`, activates the D-Bus system bus, starts `systemd-logind`, `systemd-resolved`, and `systemd-networkd`, reaches `multi-user.target`, and launches PAM-backed login prompts on `tty1` and `ttyS0`.
 
 ## Root Filesystem Model
 
@@ -32,12 +33,13 @@ The root filesystem is assembled in `staging/rootfs` from:
 
 - systemd install output from `staging/systemd`
 - D-Bus install output from `staging/dbus`
-- runtime library dependencies copied from the native build host for systemd and D-Bus binaries
+- Linux-PAM install output from `staging/pam`
+- runtime library dependencies copied from the native build host for systemd, D-Bus, PAM, and BusyBox binaries
 - BusyBox install output for shell and rescue utilities
 - kernel modules from the kernel build
 - the repository overlay in `overlay/rootfs`
 
-The default network path uses DHCP through `systemd-networkd`. DNS servers learned from DHCP are exposed through `systemd-resolved`, and `/etc/resolv.conf` is a symlink to the resolved-managed compatibility file at `/run/systemd/resolve/resolv.conf`. Tools that query systemd over D-Bus use the system bus at `/run/dbus/system_bus_socket`. The source-built systemd layer also includes `systemd-logind`, `loginctl`, the `org.freedesktop.login1` system-bus policy, and the logind varlink socket.
+The default network path uses DHCP through `systemd-networkd`. DNS servers learned from DHCP are exposed through `systemd-resolved`, and `/etc/resolv.conf` is a symlink to the resolved-managed compatibility file at `/run/systemd/resolve/resolv.conf`. Tools that query systemd over D-Bus use the system bus at `/run/dbus/system_bus_socket`. The source-built systemd layer also includes `systemd-logind`, `loginctl`, `pam_systemd.so`, the `org.freedesktop.login1` system-bus policy, and the logind varlink socket. Console login uses BusyBox `getty` and `login`; `/etc/pam.d/login` authenticates against `/etc/shadow` with `pam_unix.so` and registers sessions with `pam_systemd.so`.
 
 The default console build also generates `out/rootfs.cpio.gz` for quick QEMU smoke tests. Desktop-enabled rootfs builds skip the initramfs artifact and boot through the ext4 root partition image.
 
@@ -88,7 +90,7 @@ This is enough for a first CLI OS image and a development boot path, but not yet
 - source-built GNOME and graphical desktop dependency closure
 - source-built Openbox/Xorg/GTK graphical dependency closure
 - source-built dependency closure for systemd and D-Bus runtime libraries
-- user management beyond the root shell
+- account management beyond the built-in `forge` and `root` users
 - in-OS guided installer and update system
 - hardening review of the kernel and userspace defaults
 

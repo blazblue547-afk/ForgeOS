@@ -5,6 +5,7 @@ export KERNEL_VERSION ?= 7.1
 export BUSYBOX_VERSION ?= 1.38.0
 export SYSTEMD_VERSION ?= 260
 export DBUS_VERSION ?= 1.16.2
+export PAM_VERSION ?= 1.7.2
 export DESKTOP ?= console
 export ENABLE_DESKTOP ?= 0
 export ROOT_LABEL ?= FORGE_ROOT
@@ -19,7 +20,7 @@ export SECURE_BOOT_CERT ?=
 export GNOME_SUITE ?= trixie
 export GNOME_MIRROR ?= http://deb.debian.org/debian
 
-.PHONY: help deps image-deps fetch kernel busybox systemd dbus rootfs gnome-rootfs image gnome-image secure-boot-keys run run-image run-desktop run-gnome list-disks install clean distclean
+.PHONY: help deps image-deps fetch kernel busybox pam systemd dbus rootfs gnome-rootfs image gnome-image secure-boot-keys run run-image run-desktop run-gnome list-disks install clean distclean
 
 help:
 	@printf '%s\n' \
@@ -28,6 +29,7 @@ help:
 		'  make image-deps - install Debian/Ubuntu host deps for image + run-image' \
 		'  make fetch      - download upstream source tarballs' \
 		'  make kernel     - build the Linux kernel and stage modules' \
+		'  make pam        - build Linux-PAM for login/session tracking' \
 		'  make busybox    - build BusyBox rescue utilities' \
 		'  make systemd    - build systemd PID 1' \
 		'  make dbus       - build the D-Bus system bus daemon' \
@@ -60,6 +62,9 @@ kernel: fetch
 
 busybox: fetch
 	@./scripts/build-busybox.sh
+
+pam: fetch
+	@./scripts/build-pam.sh
 
 systemd: fetch
 	@./scripts/build-systemd.sh
