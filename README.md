@@ -34,11 +34,12 @@ As of `2026-06-16`, the project defaults to:
 
 ```bash
 cd /home/joe/forgeos
+sudo scripts/install-deps.sh
 make rootfs
 make run
 ```
 
-That path builds the kernel, systemd, D-Bus, BusyBox rescue tools, and a compressed initramfs, then boots it directly in QEMU over serial.
+That dependency script is for Debian/Ubuntu hosts and installs only the packages needed for the console rootfs plus direct QEMU boot path. The build path then builds the kernel, systemd, D-Bus, BusyBox rescue tools, and a compressed initramfs, then boots it directly in QEMU over serial.
 
 To build a UEFI disk image:
 
