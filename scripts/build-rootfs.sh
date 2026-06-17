@@ -110,6 +110,8 @@ ln -sfn /etc/systemd/system/forgeos-bootdiag.service \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/forgeos-bootdiag.service"
 ln -sfn /etc/systemd/system/forgeos-console-banner.service \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/forgeos-console-banner.service"
+ln -sfn /etc/systemd/system/forgeos-home-ownership.service \
+    "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/forgeos-home-ownership.service"
 ln -sfn /usr/lib/systemd/system/dbus.service \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/multi-user.target.wants/dbus.service"
 ln -sfn /usr/lib/systemd/system/dbus.socket \
@@ -154,10 +156,6 @@ fi
 
 if truthy "$ENABLE_DESKTOP"; then
     "$ROOT_DIR/scripts/stage-openbox-desktop.sh"
-fi
-
-if truthy "$ENABLE_DOOM_EMACS"; then
-    "$ROOT_DIR/scripts/stage-doom-emacs.sh"
 fi
 
 chmod 755 \

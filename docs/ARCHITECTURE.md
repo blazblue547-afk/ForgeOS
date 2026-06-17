@@ -10,14 +10,11 @@ ForgeOS defaults to a CLI-only operating system for `x86_64` desktops and laptop
 - Linux-PAM for local login authentication and session hooks
 - BusyBox for `/bin/sh`, early switch-root support, and compact rescue tools
 - Nix for core package management
-- optional Doom Emacs tooling for an editor-focused user environment
 - custom units and configuration files from this repository
 
 There is also an optional `DESKTOP=gnome` image flavor. That flavor keeps the ForgeOS kernel, GRUB/EFI boot flow, image builder, and kernel modules, but uses a Debian `trixie` GNOME userspace because GNOME's dependency closure is much larger than the current source-built ForgeOS userspace.
 
 The normal ForgeOS rootfs can also be built with `ENABLE_DESKTOP=1`. That does not switch to a new OS flavor: it keeps the source-built ForgeOS userspace and stages an Openbox/tint2/PCManFM desktop layer into the same rootfs.
-
-The normal rootfs can also be built with `ENABLE_DOOM_EMACS=1`. That keeps the same ForgeOS userspace and stages a Doom Emacs tool layer into it rather than switching to a distro flavor.
 
 ## Boot Model
 
@@ -53,8 +50,6 @@ The default console build also generates `out/rootfs.cpio.gz` for quick QEMU smo
 For `DESKTOP=gnome`, `scripts/build-gnome-rootfs.sh` uses `mmdebstrap` or root-run `debootstrap` to assemble a Debian GNOME root filesystem in `staging/rootfs`, adds ForgeOS identity defaults, creates the initial desktop user, enables GDM and NetworkManager, and copies ForgeOS kernel modules. The GNOME image path deliberately does not copy `rootfs.cpio.gz` into the EFI System Partition because a desktop rootfs is too large for the initramfs-based smoke-test flow.
 
 For `ENABLE_DESKTOP=1`, `scripts/stage-openbox-desktop.sh` asks apt to download the Openbox desktop package closure, extracts only the runtime payloads into `staging/rootfs`, skips base daemon packages that would replace source-built systemd or D-Bus, and enables `forgeos-desktop.service` on `tty1`.
-
-For `ENABLE_DOOM_EMACS=1`, `scripts/stage-doom-emacs.sh` stages Emacs, Git, ripgrep, GNU find, fd, CA certificates, and the upstream Doom Emacs Git checkout. The Doom checkout is stored globally at `/usr/share/doom-emacs`; `/etc/profile.d/doom-emacs.sh` seeds `~/.config/emacs` and `~/.config/doom` for each writable user home on first shell login. The per-user Doom package cache is intentionally not baked into the image; users initialize it with `doom sync` inside the running OS.
 
 ## Why EFI Stub Boot
 
@@ -96,7 +91,6 @@ This is enough for a first CLI OS image and a development boot path, but not yet
 - measured boot and full verified boot
 - full laptop Wi-Fi and firmware coverage
 - declarative NixOS-style system rebuilds and rollback management
-- pre-synced per-user Doom Emacs package caches
 - source-built GNOME and graphical desktop dependency closure
 - source-built Openbox/Xorg/GTK graphical dependency closure
 - source-built dependency closure for systemd and D-Bus runtime libraries

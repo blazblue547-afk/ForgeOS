@@ -86,8 +86,8 @@ Options:
   --help        Show this help.
 
 This does not install desktop, GNOME, disk-image, installer, or Secure Boot
-extras. It includes the host tools needed to enable optional rootfs layers such
-as Doom Emacs, but it does not install those target packages on the host.
+extras. It includes the host tools needed to enable optional rootfs layers, but
+it does not install those target packages on the host.
 EOF
 }
 

@@ -7,14 +7,26 @@ source "$(dirname "$0")/common.sh"
 require_cmd qemu-img parted mkfs.vfat mkfs.ext4 mcopy mmd dd awk truncate
 ensure_dirs
 
+normal_rootfs_matches() {
+    [[ -d "$ROOTFS_STAGING_DIR" ]] || return 1
+    [[ -f "$ROOTFS_STAGING_DIR/etc/forgeos-nix" ]] || return 1
+
+    if truthy "$ENABLE_DESKTOP"; then
+        [[ -f "$ROOTFS_STAGING_DIR/etc/forgeos-desktop" ]] || return 1
+    else
+        [[ ! -f "$ROOTFS_STAGING_DIR/etc/forgeos-desktop" ]] || return 1
+    fi
+
+    [[ ! -f "$ROOTFS_STAGING_DIR/etc/forgeos-doom-emacs" ]] || return 1
+}
+
 [[ -f "$OUT_DIR/bzImage" ]] || "$ROOT_DIR/scripts/build-kernel.sh"
 if [[ "$DESKTOP" == "gnome" ]]; then
     [[ -d "$ROOTFS_STAGING_DIR" && -f "$ROOTFS_STAGING_DIR/etc/gdm3/daemon.conf" ]] || "$ROOT_DIR/scripts/build-gnome-rootfs.sh"
 else
-    if truthy "$ENABLE_DESKTOP"; then
-        [[ -d "$ROOTFS_STAGING_DIR" && -f "$ROOTFS_STAGING_DIR/etc/forgeos-desktop" && -f "$ROOTFS_STAGING_DIR/etc/forgeos-nix" ]] || "$ROOT_DIR/scripts/build-rootfs.sh"
-    else
-        [[ -d "$ROOTFS_STAGING_DIR" && -f "$ROOTFS_STAGING_DIR/etc/forgeos-nix" ]] || "$ROOT_DIR/scripts/build-rootfs.sh"
+    normal_rootfs_matches || "$ROOT_DIR/scripts/build-rootfs.sh"
+
+    if ! truthy "$ENABLE_DESKTOP"; then
         [[ -f "$OUT_DIR/rootfs.cpio.gz" ]] || "$ROOT_DIR/scripts/build-rootfs.sh"
     fi
 fi

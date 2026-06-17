@@ -16,10 +16,6 @@ GNOME_USER_PASSWORD=${GNOME_USER_PASSWORD:-forge}
 GNOME_AUTOLOGIN=${GNOME_AUTOLOGIN:-1}
 GNOME_PACKAGES=${GNOME_PACKAGES:-systemd-sysv dbus dbus-user-session gnome-core gdm3 network-manager sudo locales xserver-xorg xserver-xorg-video-all xserver-xorg-input-libinput mesa-utils fonts-dejavu firmware-linux-free}
 
-if truthy "$ENABLE_DOOM_EMACS"; then
-    GNOME_PACKAGES="$GNOME_PACKAGES $DOOM_EMACS_PACKAGES"
-fi
-
 normalize_packages_csv() {
     local package_csv
 
@@ -277,9 +273,6 @@ msg "configuring ForgeOS GNOME defaults"
 configure_identity
 configure_user
 configure_desktop_services
-if truthy "$ENABLE_DOOM_EMACS"; then
-    "$ROOT_DIR/scripts/stage-doom-emacs.sh"
-fi
 
 mkdir -p "$ROOTFS_STAGING_DIR/lib" "$ROOTFS_STAGING_DIR/boot"
 rsync -a "$MODULES_STAGING_DIR/lib/" "$ROOTFS_STAGING_DIR/lib/"

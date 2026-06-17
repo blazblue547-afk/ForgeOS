@@ -1,0 +1,12 @@
+[Unit]
+Description=Repair ForgeOS user home ownership
+Documentation=man:systemd.service(5)
+After=local-fs.target
+Before=systemd-user-sessions.service getty.target forgeos-login@tty1.service forgeos-login@ttyS0.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'if [ -d /home/forge ]; then chown -R 1000:1000 /home/forge && chmod 700 /home/forge; fi'
+
+[Install]
+WantedBy=multi-user.target
