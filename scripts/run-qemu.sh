@@ -63,6 +63,8 @@ case "$MODE" in
                     -boot order=c \
                     -bios "$FIRMWARE" \
                     -drive file="$IMAGE_PATH",format=raw,if=virtio \
+                    -netdev user,id=net0 \
+                    -device virtio-net-pci,netdev=net0 \
                     -device virtio-rng-pci
                 ;;
             pflash:*)
@@ -81,6 +83,8 @@ case "$MODE" in
                     -drive if=pflash,format=raw,readonly=on,file="$CODE_FD" \
                     -drive if=pflash,format=raw,file="$VARS_COPY" \
                     -drive file="$IMAGE_PATH",format=raw,if=virtio \
+                    -netdev user,id=net0 \
+                    -device virtio-net-pci,netdev=net0 \
                     -device virtio-rng-pci
                 rm -f "$VARS_COPY"
                 ;;
