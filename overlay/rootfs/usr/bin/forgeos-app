@@ -22,13 +22,6 @@ Short names are expanded to nixpkgs#NAME for install and shell.
 EOF
 }
 
-need_nix() {
-    command -v nix >/dev/null 2>&1 || {
-        echo "nix is unavailable; is the ForgeOS app layer mounted?" >&2
-        exit 1
-    }
-}
-
 as_installable() {
     case "$1" in
         *#*|/*|git+*|http://*|https://*)
@@ -52,6 +45,51 @@ show_mount() {
             }
         }
     ' /proc/mounts
+}
+
+find_nix() {
+    if command -v nix >/dev/null 2>&1; then
+        command -v nix
+        return 0
+    fi
+
+    if [ -x /nix/var/nix/profiles/default/bin/nix ]; then
+        printf '%s\n' /nix/var/nix/profiles/default/bin/nix
+        return 0
+    fi
+
+    for candidate in /nix/store/*-nix-*/bin/nix; do
+        [ -x "$candidate" ] || continue
+        printf '%s\n' "$candidate"
+        return 0
+    done
+
+    return 1
+}
+
+diagnose_missing_nix() {
+    echo "nix is unavailable; is the ForgeOS app layer mounted?" >&2
+    show_mount /forge >&2
+    show_mount /nix >&2
+    echo "check: lsblk -f" >&2
+    echo "check: systemctl status forge.mount forgeos-nix-bootstrap.service nix-daemon.service nix-daemon.socket" >&2
+    echo "repair as root: mount LABEL=FORGE_APPS /forge && mount -a && systemctl restart forgeos-nix-bootstrap.service nix-daemon.socket nix-daemon.service" >&2
+}
+
+need_nix() {
+    if NIX_BIN=$(find_nix); then
+        export NIX_BIN
+        export NIX_REMOTE=${NIX_REMOTE:-daemon}
+        return 0
+    fi
+
+    diagnose_missing_nix
+    exit 1
+}
+
+run_nix() {
+    need_nix
+    "$NIX_BIN" "$@"
 }
 
 cmd=${1:-}
@@ -78,9 +116,8 @@ case "$cmd" in
             usage >&2
             exit 2
         }
-        need_nix
         for item in "$@"; do
-            nix profile install "$(as_installable "$item")"
+            run_nix profile install "$(as_installable "$item")"
         done
         ;;
     remove)
@@ -88,32 +125,27 @@ case "$cmd" in
             usage >&2
             exit 2
         }
-        need_nix
-        nix profile remove "$@"
+        run_nix profile remove "$@"
         ;;
     list)
-        need_nix
-        nix profile list
+        run_nix profile list
         ;;
     search)
         [ "$#" -gt 0 ] || {
             usage >&2
             exit 2
         }
-        need_nix
-        nix search nixpkgs "$@"
+        run_nix search nixpkgs "$@"
         ;;
     upgrade)
-        need_nix
         if [ "$#" -eq 0 ]; then
-            nix profile upgrade '.*'
+            run_nix profile upgrade '.*'
         else
-            nix profile upgrade "$@"
+            run_nix profile upgrade "$@"
         fi
         ;;
     rollback)
-        need_nix
-        nix profile rollback
+        run_nix profile rollback
         ;;
     shell)
         [ "$#" -gt 0 ] || {
@@ -126,12 +158,12 @@ case "$cmd" in
         for item in "$@"; do
             expanded="${expanded}${expanded:+ }$(as_installable "$item")"
         done
+        need_nix
         # shellcheck disable=SC2086
-        exec nix shell $expanded
+        exec "$NIX_BIN" shell $expanded
         ;;
     gc)
-        need_nix
-        nix store gc
+        run_nix store gc
         ;;
     help|--help|-h)
         usage

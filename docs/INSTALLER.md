@@ -87,6 +87,23 @@ Enroll `out/secure-boot/ForgeOS.cer` in the target firmware Secure Boot database
 - Avoid leaving multiple ForgeOS installations attached during early testing, because multiple disks with the same GPT partition label can confuse root selection.
 - Secure Boot trust is tied to the enrolled signing certificate. Protect the generated private key.
 
+## App Layer Recovery
+
+If an installed machine reports `nix is unavailable; is the ForgeOS app layer mounted?`, confirm the app partition exists and is mounted:
+
+```bash
+forgeos-app status
+lsblk -f
+```
+
+If `FORGE_APPS` exists but `/forge` or `/nix` is not mounted, recover the current boot as root:
+
+```bash
+mount LABEL=FORGE_APPS /forge
+mount -a
+systemctl restart forgeos-nix-bootstrap.service nix-daemon.socket nix-daemon.service
+```
+
 ## Current Limitation
 
 This is a host-side installer, not an in-OS guided installer yet. There is no partitioning UI, user setup wizard, or live environment workflow in this version.

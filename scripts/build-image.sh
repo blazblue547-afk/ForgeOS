@@ -129,13 +129,13 @@ write_atomic_fstab() {
     cat > "$BASE_ROOTFS_STAGING_DIR/etc/fstab" <<EOF
 # ForgeOS keeps the base OS read-only in disk images and mounts mutable
 # applications and state from the app layer.
-LABEL=$APP_LABEL /forge ext4 rw,relatime,nofail,x-systemd.device-timeout=5s 0 2
-/forge/nix /nix none bind,nofail,x-systemd.after=forge.mount 0 0
-/forge/home /home none bind,nofail,x-systemd.after=forge.mount 0 0
-/forge/root /root none bind,nofail,x-systemd.after=forge.mount 0 0
-/forge/var /var none bind,nofail,x-systemd.after=forge.mount 0 0
-/forge/opt /opt none bind,nofail,x-systemd.after=forge.mount 0 0
-/forge/usr-local /usr/local none bind,nofail,x-systemd.after=forge.mount 0 0
+LABEL=$APP_LABEL /forge ext4 rw,relatime,nofail,x-systemd.device-timeout=60s 0 2
+/forge/nix /nix none bind,nofail,x-systemd.requires=forge.mount,x-systemd.after=forge.mount 0 0
+/forge/home /home none bind,nofail,x-systemd.requires=forge.mount,x-systemd.after=forge.mount 0 0
+/forge/root /root none bind,nofail,x-systemd.requires=forge.mount,x-systemd.after=forge.mount 0 0
+/forge/var /var none bind,nofail,x-systemd.requires=forge.mount,x-systemd.after=forge.mount 0 0
+/forge/opt /opt none bind,nofail,x-systemd.requires=forge.mount,x-systemd.after=forge.mount 0 0
+/forge/usr-local /usr/local none bind,nofail,x-systemd.requires=forge.mount,x-systemd.after=forge.mount 0 0
 tmpfs /tmp tmpfs rw,nosuid,nodev,mode=1777 0 0
 EOF
 }

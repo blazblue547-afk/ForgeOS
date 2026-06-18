@@ -59,6 +59,21 @@ The wrapper uses Nix profiles underneath, so direct Nix commands still work:
 nix profile install nixpkgs#hello
 ```
 
+If `forgeos-app` says `nix is unavailable`, check whether the app layer mounted:
+
+```bash
+forgeos-app status
+lsblk -f
+```
+
+On an installed system with a `FORGE_APPS` partition, recover the current boot as root:
+
+```bash
+mount LABEL=FORGE_APPS /forge
+mount -a
+systemctl restart forgeos-nix-bootstrap.service nix-daemon.socket nix-daemon.service
+```
+
 To build a UEFI disk image:
 
 ```bash
