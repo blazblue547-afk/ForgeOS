@@ -17,6 +17,7 @@ image_packages=(
     grub-common
     grub-efi-amd64-bin
     ovmf
+    fakeroot
 )
 
 required_commands=(
@@ -31,6 +32,7 @@ required_commands=(
     awk
     truncate
     qemu-system-x86_64
+    fakeroot
 )
 
 required_paths=(

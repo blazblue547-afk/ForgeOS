@@ -22,15 +22,17 @@ ForgeOS currently targets UEFI systems.
 
 1. The disk image contains a GPT.
 2. Partition 1 is a FAT32 EFI System Partition labeled `FORGE_EFI`.
-3. By default, `out/BOOTX64.EFI` is a standalone GRUB UEFI fallback loader with a small debug boot menu.
-4. The built kernel EFI stub is copied to `EFI/BOOT/FORGEOS.EFI`.
-5. UEFI firmware executes GRUB from `EFI/BOOT/BOOTX64.EFI`, and GRUB starts the kernel.
-6. The built-in kernel command line mounts `PARTLABEL=root` as the real root filesystem.
-7. systemd starts as `/sbin/init`, activates the D-Bus system bus, starts `systemd-logind`, `systemd-resolved`, and `systemd-networkd`, reaches `multi-user.target`, and launches PAM-backed login prompts on `tty1` and `ttyS0`.
+3. Partition 2 is an ext4 base OS partition labeled `FORGE_ROOT` with GPT partition label `root`.
+4. Partition 3 is an ext4 writable app/state partition labeled `FORGE_APPS` with GPT partition label `apps`.
+5. By default, `out/BOOTX64.EFI` is a standalone GRUB UEFI fallback loader with a small debug boot menu.
+6. The built kernel EFI stub is copied to `EFI/BOOT/FORGEOS.EFI`.
+7. UEFI firmware executes GRUB from `EFI/BOOT/BOOTX64.EFI`, and GRUB starts the kernel.
+8. The kernel mounts `PARTLABEL=root` as the real root filesystem with `ro` so the base OS stays atomic.
+9. systemd starts as `/sbin/init`, mounts the app layer at `/forge`, bind-mounts mutable paths from it, activates the D-Bus system bus, starts `systemd-logind`, `systemd-resolved`, and `systemd-networkd`, reaches `multi-user.target`, and launches PAM-backed login prompts on `tty1` and `ttyS0`.
 
 ## Root Filesystem Model
 
-The root filesystem is assembled in `staging/rootfs` from:
+The canonical root filesystem is assembled in `staging/rootfs` from:
 
 - systemd install output from `staging/systemd`
 - D-Bus install output from `staging/dbus`
@@ -41,11 +43,18 @@ The root filesystem is assembled in `staging/rootfs` from:
 - kernel modules from the kernel build
 - the repository overlay in `overlay/rootfs`
 
+For normal ForgeOS disk images, `scripts/build-image.sh` derives two trees from `staging/rootfs`:
+
+- `staging/rootfs-base`: the read-only base OS used for partition 2
+- `staging/appfs`: the writable app/state layer used for partition 3
+
+The base tree keeps the source-built OS, boot-critical tools, systemd units, configuration, and symlinks into `/nix/store`. The app/state tree owns `/nix`, `/home`, `/root`, `/var`, `/opt`, and `/usr/local`. The image builder writes an `/etc/fstab` into `staging/rootfs-base` that mounts `LABEL=FORGE_APPS` at `/forge` and bind-mounts those paths back into the normal filesystem layout. `/tmp` is a tmpfs. The canonical `staging/rootfs` used for `rootfs.cpio.gz` does not include those app-layer fstab entries, so the direct initramfs smoke-test path stays monolithic and does not wait for a disk app partition.
+
 The default network path uses DHCP through `systemd-networkd`. DNS servers learned from DHCP are exposed through `systemd-resolved`, and `/etc/resolv.conf` is a symlink to the resolved-managed compatibility file at `/run/systemd/resolve/resolv.conf`. Tools that query systemd over D-Bus use the system bus at `/run/dbus/system_bus_socket`. The source-built systemd layer also includes `systemd-logind`, `loginctl`, `pam_systemd.so`, the `org.freedesktop.login1` system-bus policy, and the logind varlink socket. Console login uses BusyBox `getty` and `login`; `/etc/pam.d/login` authenticates against `/etc/shadow` with `pam_unix.so` and registers sessions with `pam_systemd.so`.
 
-Nix is integrated as a multi-user daemon package manager in the normal ForgeOS rootfs. `scripts/stage-nix.sh` copies the official Nix store closure into `/nix/store`, stages `nix.conf`, adds `nixbld` build accounts, enables `forgeos-nix-bootstrap.service`, and exposes `nix-daemon.service` plus `nix-daemon.socket`. On first boot, the bootstrap service fixes `/nix` ownership, loads the bundled `.reginfo` into the Nix database, and creates the default profile with Nix, Nix manual pages, and the bundled CA certificate package. ForgeOS enables `nix-command` and `flakes`, uses `cache.nixos.org`, and leaves Nix build sandboxing disabled until the OS has a verified sandbox policy.
+Nix is integrated as a multi-user daemon package manager in the normal ForgeOS app layer. `scripts/stage-nix.sh` copies the official Nix store closure into `/nix/store`, stages `nix.conf`, adds `nixbld` build accounts, enables `forgeos-nix-bootstrap.service`, and exposes `nix-daemon.service` plus `nix-daemon.socket`. On disk images, the image builder moves that `/nix` tree into `staging/appfs` so package installs and Nix state mutate the app partition, not the base OS. On first boot, the bootstrap service fixes `/nix` ownership, loads the bundled `.reginfo` into the Nix database, and creates the default profile with Nix, Nix manual pages, and the bundled CA certificate package. ForgeOS enables `nix-command` and `flakes`, uses `cache.nixos.org`, and leaves Nix build sandboxing disabled until the OS has a verified sandbox policy.
 
-The default console build also generates `out/rootfs.cpio.gz` for quick QEMU smoke tests. Desktop-enabled rootfs builds skip the initramfs artifact and boot through the ext4 root partition image.
+The default console build also generates `out/rootfs.cpio.gz` for quick QEMU smoke tests. That direct initramfs path is intentionally monolithic and writable because it has no persistent app partition. Desktop-enabled rootfs builds skip the initramfs artifact and boot through the ext4 disk image path.
 
 For `DESKTOP=gnome`, `scripts/build-gnome-rootfs.sh` uses `mmdebstrap` or root-run `debootstrap` to assemble a Debian GNOME root filesystem in `staging/rootfs`, adds ForgeOS identity defaults, creates the initial desktop user, enables GDM and NetworkManager, and copies ForgeOS kernel modules. The GNOME image path deliberately does not copy `rootfs.cpio.gz` into the EFI System Partition because a desktop rootfs is too large for the initramfs-based smoke-test flow.
 
@@ -96,6 +105,7 @@ This is enough for a first CLI OS image and a development boot path, but not yet
 - source-built dependency closure for systemd and D-Bus runtime libraries
 - account management beyond the built-in `forge` and `root` users
 - in-OS guided installer and update system
+- base OS rollback selection across multiple base deployments
 - hardening review of the kernel and userspace defaults
 
 ## Suggested Next Steps

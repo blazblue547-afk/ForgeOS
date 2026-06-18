@@ -1,0 +1,143 @@
+#!/bin/sh
+
+set -eu
+
+PATH=/usr/bin:/usr/sbin:/bin:/sbin
+export PATH
+
+usage() {
+    cat <<'EOF'
+Usage:
+  forgeos-app status
+  forgeos-app install NAME|FLAKE...
+  forgeos-app remove PACKAGE...
+  forgeos-app list
+  forgeos-app search TERMS...
+  forgeos-app upgrade [PACKAGE...]
+  forgeos-app rollback
+  forgeos-app shell NAME|FLAKE...
+  forgeos-app gc
+
+Short names are expanded to nixpkgs#NAME for install and shell.
+EOF
+}
+
+need_nix() {
+    command -v nix >/dev/null 2>&1 || {
+        echo "nix is unavailable; is the ForgeOS app layer mounted?" >&2
+        exit 1
+    }
+}
+
+as_installable() {
+    case "$1" in
+        *#*|/*|git+*|http://*|https://*)
+            printf '%s\n' "$1"
+            ;;
+        *)
+            printf 'nixpkgs#%s\n' "$1"
+            ;;
+    esac
+}
+
+show_mount() {
+    awk -v target="$1" '
+        $2 == target {
+            printf "%-12s <- %s (%s, %s)\n", target, $1, $3, $4
+            found = 1
+        }
+        END {
+            if (!found) {
+                printf "%-12s <- not mounted\n", target
+            }
+        }
+    ' /proc/mounts
+}
+
+cmd=${1:-}
+if [ -z "$cmd" ]; then
+    usage
+    exit 2
+fi
+shift || true
+
+case "$cmd" in
+    status)
+        show_mount /
+        show_mount /forge
+        show_mount /nix
+        show_mount /home
+        show_mount /root
+        show_mount /var
+        show_mount /opt
+        show_mount /usr/local
+        df -h /forge /nix /home 2>/dev/null || true
+        ;;
+    install)
+        [ "$#" -gt 0 ] || {
+            usage >&2
+            exit 2
+        }
+        need_nix
+        for item in "$@"; do
+            nix profile install "$(as_installable "$item")"
+        done
+        ;;
+    remove)
+        [ "$#" -gt 0 ] || {
+            usage >&2
+            exit 2
+        }
+        need_nix
+        nix profile remove "$@"
+        ;;
+    list)
+        need_nix
+        nix profile list
+        ;;
+    search)
+        [ "$#" -gt 0 ] || {
+            usage >&2
+            exit 2
+        }
+        need_nix
+        nix search nixpkgs "$@"
+        ;;
+    upgrade)
+        need_nix
+        if [ "$#" -eq 0 ]; then
+            nix profile upgrade '.*'
+        else
+            nix profile upgrade "$@"
+        fi
+        ;;
+    rollback)
+        need_nix
+        nix profile rollback
+        ;;
+    shell)
+        [ "$#" -gt 0 ] || {
+            usage >&2
+            exit 2
+        }
+        need_nix
+        set -- "$@"
+        expanded=
+        for item in "$@"; do
+            expanded="${expanded}${expanded:+ }$(as_installable "$item")"
+        done
+        # shellcheck disable=SC2086
+        exec nix shell $expanded
+        ;;
+    gc)
+        need_nix
+        nix store gc
+        ;;
+    help|--help|-h)
+        usage
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac

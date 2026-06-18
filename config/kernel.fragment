@@ -88,5 +88,5 @@ CONFIG_IGB=y
 CONFIG_IGC=y
 CONFIG_TG3=y
 CONFIG_CMDLINE_BOOL=y
-CONFIG_CMDLINE="root=PARTLABEL=root rootfstype=ext4 rootwait rw console=tty0 console=ttyS0,115200n8 loglevel=7 ignore_loglevel i915.enable_psr=0 i915.fastboot=0"
+CONFIG_CMDLINE="root=PARTLABEL=root rootfstype=ext4 rootwait ro console=tty0 console=ttyS0,115200n8 loglevel=7 ignore_loglevel i915.enable_psr=0 i915.fastboot=0"
 # CONFIG_CMDLINE_OVERRIDE is not set

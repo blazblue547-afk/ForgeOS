@@ -12,6 +12,8 @@ export DESKTOP ?= console
 export ENABLE_DESKTOP ?= 0
 export ROOT_LABEL ?= FORGE_ROOT
 export EFI_LABEL ?= FORGE_EFI
+export APP_LABEL ?= FORGE_APPS
+export ATOMIC_BASE ?= 1
 desktop_enabled := $(filter 1 true TRUE yes YES on ON,$(ENABLE_DESKTOP))
 export IMAGE_SIZE_MIB ?= $(if $(filter gnome,$(DESKTOP)),12288,$(if $(desktop_enabled),6144,4096))
 export ESP_SIZE_MIB ?= 256
@@ -40,6 +42,7 @@ help:
 		'  ENABLE_DESKTOP=1 make rootfs - add Openbox/tint2/PCManFM desktop' \
 		'  make gnome-rootfs - assemble a Debian GNOME desktop rootfs' \
 		'  make image      - build a bootable GPT/UEFI disk image' \
+		'  make image builds an atomic read-only base plus writable app/state layer' \
 		'  make gnome-image - build a bootable GPT/UEFI GNOME disk image' \
 		'  make secure-boot-keys - generate a local Secure Boot signing keypair' \
 		'  make run        - boot kernel + initramfs in QEMU' \
@@ -101,7 +104,7 @@ run-image:
 	@./scripts/run-qemu.sh image
 
 run-desktop: ENABLE_DESKTOP = 1
-run-desktop: IMAGE_SIZE_MIB = 4096
+run-desktop: IMAGE_SIZE_MIB = 6144
 run-desktop: MEMORY_MB = 3072
 run-desktop: image
 	@./scripts/run-qemu.sh image-gui

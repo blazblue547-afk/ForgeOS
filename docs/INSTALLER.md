@@ -13,8 +13,8 @@ It installs the built raw ForgeOS image to a real block device from an existing 
 3. optionally unmounts non-critical target partitions
 4. writes the ForgeOS raw image to the target disk
 5. repairs the GPT backup header on larger disks
-6. expands partition `2` and the ext4 root filesystem to fill the device
-7. randomizes the ext4 root filesystem UUID by default
+6. expands the writable app/state partition to fill the device
+7. randomizes ext4 filesystem UUIDs by default
 
 ## Basic Usage
 
@@ -39,11 +39,11 @@ cd /home/joe/forgeos
 sudo make install DISK=/dev/sdc INSTALL_ARGS="--yes --unmount"
 ```
 
-Install without expanding the root filesystem:
+Install without expanding the writable app/state filesystem:
 
 ```bash
 cd /home/joe/forgeos
-sudo make install DISK=/dev/sdc INSTALL_ARGS="--no-expand-root"
+sudo make install DISK=/dev/sdc INSTALL_ARGS="--no-expand-apps"
 ```
 
 ## Direct Script Usage
@@ -57,8 +57,10 @@ Optional arguments:
 - `--image /path/to/forgeos.img`
 - `--yes`
 - `--unmount`
-- `--no-expand-root`
-- `--keep-root-uuid`
+- `--no-expand-apps`
+- `--no-expand-root` as a legacy alias for `--no-expand-apps`
+- `--keep-uuids`
+- `--keep-root-uuid` as a legacy alias for `--keep-uuids`
 
 ## Secure Boot Images
 
@@ -81,6 +83,7 @@ Enroll `out/secure-boot/ForgeOS.cer` in the target firmware Secure Boot database
 - The installer is destructive. It erases the target disk.
 - Run it from a Linux host, not from the disk you are installing over.
 - The current boot model uses a built-in kernel command line with `root=PARTLABEL=root`.
+- Normal ForgeOS images use partition `2` for the read-only base OS and partition `3` for mutable apps and state.
 - Avoid leaving multiple ForgeOS installations attached during early testing, because multiple disks with the same GPT partition label can confuse root selection.
 - Secure Boot trust is tied to the enrolled signing certificate. Protect the generated private key.
 

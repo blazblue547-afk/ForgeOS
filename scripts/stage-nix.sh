@@ -119,11 +119,41 @@ mkdir -p \\
     "\$NIX_STATE/daemon-socket" \\
     /root
 
-chown root:root /nix /nix/var /nix/var/nix /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs 2>/dev/null || true
+chown root:root \\
+    /nix \\
+    /nix/var \\
+    /nix/var/log \\
+    /nix/var/log/nix \\
+    /nix/var/log/nix/drvs \\
+    "\$NIX_STATE" \\
+    "\$NIX_STATE/bootstrap" \\
+    "\$NIX_STATE/db" \\
+    "\$NIX_STATE/gcroots" \\
+    "\$NIX_STATE/gcroots/per-user" \\
+    "\$NIX_STATE/profiles" \\
+    "\$NIX_STATE/profiles/per-user" \\
+    "\$NIX_STATE/temproots" \\
+    "\$NIX_STATE/userpool" \\
+    "\$NIX_STATE/daemon-socket" 2>/dev/null || true
 chown -R root:nixbld /nix/store 2>/dev/null || true
 chmod 1775 /nix/store
 chmod -R ugo-w /nix/store/* 2>/dev/null || true
-chmod 0755 "\$NIX_STATE" "\$NIX_STATE/bootstrap" "\$NIX_STATE/daemon-socket"
+chmod 0755 \\
+    /nix \\
+    /nix/var \\
+    /nix/var/log \\
+    /nix/var/log/nix \\
+    /nix/var/log/nix/drvs \\
+    "\$NIX_STATE" \\
+    "\$NIX_STATE/bootstrap" \\
+    "\$NIX_STATE/db" \\
+    "\$NIX_STATE/gcroots" \\
+    "\$NIX_STATE/gcroots/per-user" \\
+    "\$NIX_STATE/profiles" \\
+    "\$NIX_STATE/profiles/per-user" \\
+    "\$NIX_STATE/temproots" \\
+    "\$NIX_STATE/userpool" \\
+    "\$NIX_STATE/daemon-socket"
 
 if [ -e "\$MARKER" ]; then
     exit 0
@@ -151,9 +181,11 @@ cat > "$ROOTFS_STAGING_DIR/etc/systemd/system/forgeos-nix-bootstrap.service" <<'
 Description=Bootstrap ForgeOS Nix store
 DefaultDependencies=no
 After=local-fs.target
-Before=sockets.target multi-user.target
+Before=nix-daemon.socket nix-daemon.service sockets.target multi-user.target
+RequiresMountsFor=/nix/store
+RequiresMountsFor=/nix/var/nix/bootstrap
+RequiresMountsFor=/nix/var/nix/db
 ConditionPathExists=/nix/var/nix/bootstrap/reginfo
-ConditionPathExists=!/nix/var/nix/forgeos-bootstrap-complete
 
 [Service]
 Type=oneshot
@@ -169,6 +201,7 @@ cat > "$ROOTFS_STAGING_DIR/etc/systemd/system/nix-daemon.service" <<EOF
 Description=Nix package manager daemon
 Documentation=man:nix-daemon https://nixos.org/manual
 After=forgeos-nix-bootstrap.service
+Requires=forgeos-nix-bootstrap.service
 RequiresMountsFor=/nix/store
 RequiresMountsFor=/nix/var
 RequiresMountsFor=/nix/var/nix/db
@@ -188,7 +221,9 @@ EOF
 cat > "$ROOTFS_STAGING_DIR/etc/systemd/system/nix-daemon.socket" <<'EOF'
 [Unit]
 Description=Nix package manager daemon socket
+After=forgeos-nix-bootstrap.service
 Before=multi-user.target
+Requires=forgeos-nix-bootstrap.service
 RequiresMountsFor=/nix/store
 ConditionPathIsReadWrite=/nix/var/nix/daemon-socket
 

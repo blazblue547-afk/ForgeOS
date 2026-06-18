@@ -63,6 +63,7 @@ ensure_dirs
 [[ -x "$BUSYBOX_BUILD_DIR/busybox" && -f "$OUT_DIR/busybox.config" ]] || "$ROOT_DIR/scripts/build-busybox.sh"
 grep -qx 'CONFIG_PAM=y' "$OUT_DIR/busybox.config" || "$ROOT_DIR/scripts/build-busybox.sh"
 grep -qx 'CONFIG_LOGIN_SESSION_AS_CHILD=y' "$OUT_DIR/busybox.config" || "$ROOT_DIR/scripts/build-busybox.sh"
+grep -qx 'CONFIG_AWK=y' "$OUT_DIR/busybox.config" || "$ROOT_DIR/scripts/build-busybox.sh"
 [[ -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd" && -x "$SYSTEMD_STAGING_DIR/usr/lib/systemd/systemd-logind" && -f "$SYSTEMD_STAGING_DIR/usr/lib/security/pam_systemd.so" && -f "$SYSTEMD_STAGING_DIR/.forgeos-systemd-complete" ]] || "$ROOT_DIR/scripts/build-systemd.sh"
 [[ -x "$DBUS_STAGING_DIR/usr/bin/dbus-daemon" && -f "$DBUS_STAGING_DIR/.forgeos-dbus-complete" ]] || "$ROOT_DIR/scripts/build-dbus.sh"
 [[ -f "$OUT_DIR/bzImage" ]] || "$ROOT_DIR/scripts/build-kernel.sh"
@@ -84,7 +85,7 @@ rsync -a "$SYSTEMD_STAGING_DIR"/ "$ROOTFS_STAGING_DIR"/
 rsync -a "$DBUS_STAGING_DIR"/ "$ROOTFS_STAGING_DIR"/
 copy_busybox_deps
 
-mkdir -p "$ROOTFS_STAGING_DIR"/{proc,sys,dev,run/dbus,tmp,var/lib/dbus,var/log,root,home/forge,boot,mnt,etc/systemd/system}
+mkdir -p "$ROOTFS_STAGING_DIR"/{proc,sys,dev,run/dbus,tmp,var/lib/dbus,var/log,root,home/forge,boot,mnt,forge,opt,usr/local,etc/systemd/system}
 rsync -a "$OVERLAY_DIR"/ "$ROOTFS_STAGING_DIR"/
 "$ROOT_DIR/scripts/stage-nix.sh"
 
@@ -93,6 +94,8 @@ ln -s ../usr/lib/systemd/systemd "$ROOTFS_STAGING_DIR/sbin/init"
 ln -sfn ../../sbin/modprobe "$ROOTFS_STAGING_DIR/usr/bin/modprobe"
 ln -sfn ../run/systemd/resolve/resolv.conf "$ROOTFS_STAGING_DIR/etc/resolv.conf"
 ln -sfn ../run "$ROOTFS_STAGING_DIR/var/run"
+: > "$ROOTFS_STAGING_DIR/etc/machine-id"
+chmod 0444 "$ROOTFS_STAGING_DIR/etc/machine-id"
 
 mkdir -p \
     "$ROOTFS_STAGING_DIR/etc/systemd/system/getty.target.wants" \
@@ -164,6 +167,7 @@ chmod 755 \
     "$ROOTFS_STAGING_DIR/sbin/forgeos-console-banner" \
     "$ROOTFS_STAGING_DIR/sbin/forgeos-switch-root" \
     "$ROOTFS_STAGING_DIR/usr/lib/forgeos/nix-bootstrap" \
+    "$ROOTFS_STAGING_DIR/usr/bin/forgeos-app" \
     "$ROOTFS_STAGING_DIR/usr/bin/neofetch" \
     "$ROOTFS_STAGING_DIR/usr/share/udhcpc/default.script"
 chmod 700 "$ROOTFS_STAGING_DIR/root" "$ROOTFS_STAGING_DIR/home/forge"

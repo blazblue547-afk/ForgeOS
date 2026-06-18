@@ -22,7 +22,8 @@ As of `2026-06-17`, the project defaults to:
 - a minimal root filesystem with systemd as `/sbin/init`
 - a bootable GPT disk image with:
   - an EFI system partition
-  - an ext4 root partition
+  - a read-only ext4 base root partition
+  - a writable ext4 app/state partition
 - a faster QEMU smoke-test path using `kernel + initramfs`
 
 ## Layout
@@ -45,11 +46,17 @@ That dependency script is for Debian/Ubuntu hosts and installs only the packages
 
 The default console accounts are `forge` and `root`; both use the password `forge`. Console logins go through BusyBox `login`, Linux-PAM, and `pam_systemd.so`, so `systemd-logind` tracks real per-user sessions.
 
-Nix is staged into the normal ForgeOS rootfs as the core package manager. On first boot, `forgeos-nix-bootstrap.service` registers the initial `/nix/store` closure, creates the default Nix profile, and starts `nix-daemon`. Log in as `forge` and install packages with the modern profile command:
+Nix is staged into the writable ForgeOS app layer as the core package manager. Disk images boot a read-only base OS and bind the app layer over `/nix`, `/home`, `/root`, `/var`, `/opt`, and `/usr/local`. On first boot, `forgeos-nix-bootstrap.service` registers the initial `/nix/store` closure, creates the default Nix profile, and starts `nix-daemon`. Log in as `forge` and install apps with the friendly wrapper:
+
+```bash
+forgeos-app install hello
+hello
+```
+
+The wrapper uses Nix profiles underneath, so direct Nix commands still work:
 
 ```bash
 nix profile install nixpkgs#hello
-hello
 ```
 
 To build a UEFI disk image:
@@ -101,9 +108,9 @@ sudo make install DISK=/dev/nvme0n1
 - The default removable-media boot path uses GRUB at `EFI/BOOT/BOOTX64.EFI` and keeps the kernel EFI stub at `EFI/BOOT/FORGEOS.EFI`.
 - The built-in kernel command line targets `PARTLABEL=root` and keeps Intel graphics modesetting enabled, with a couple of laptop display workarounds for newer firmware.
 - For default direct QEMU testing, `scripts/run-qemu.sh direct` uses the generated `rootfs.cpio.gz`.
-- The host-side installer expands the root partition to fill larger target disks.
+- The host-side installer expands the writable app/state partition to fill larger target disks. The base root partition stays fixed-size and read-only at runtime.
 - systemd is installed as `/sbin/init`. BusyBox remains available for `/bin/sh`, PAM-backed `/bin/login`, early switch-root support, and emergency command-line tools.
-- Nix `2.34.0` is staged from the official `x86_64-linux` binary tarball and configured in multi-user daemon mode with `/nix`, `nixbld` build users, `cache.nixos.org`, and `nix-command`/`flakes` enabled. Override `NIX_VERSION` or `NIX_SYSTEM` if you intentionally want a different upstream tarball.
+- Nix `2.34.0` is staged from the official `x86_64-linux` binary tarball and configured in multi-user daemon mode with `/nix`, `nixbld` build users, `cache.nixos.org`, and `nix-command`/`flakes` enabled. The `/nix` tree lives in the mutable app layer on disk images. Override `NIX_VERSION` or `NIX_SYSTEM` if you intentionally want a different upstream tarball.
 - A ForgeOS-native `neofetch` command is included in the overlay with a custom ForgeOS ASCII logo at `/usr/share/neofetch/ascii/distro/forgeos`.
 - The console starts PAM-backed login prompts on `tty1` and `ttyS0` through native systemd units instead of BusyBox `inittab`.
 - The system bus is provided by source-built `dbus-daemon` and socket-activated at `/run/dbus/system_bus_socket`.
@@ -146,7 +153,7 @@ Linux-PAM, systemd, and D-Bus are built with Meson/Ninja and staged dynamically.
 - UEFI only for now; BIOS boot is not implemented.
 - The kernel config includes common desktop, laptop, and QEMU storage/input paths, but not every vendor driver.
 - Wireless firmware, GPU acceleration, stock Microsoft-trusted Secure Boot/shim integration, audio, and power-management polish are not bundled yet.
-- Nix is the package manager for the normal ForgeOS rootfs, but ForgeOS does not yet have a declarative NixOS-style system rebuild/update flow.
+- Nix is the package manager for the mutable app layer, but ForgeOS does not yet have a declarative NixOS-style base OS rebuild/update flow or rollback selector.
 - Account management is limited to the built-in `forge` and `root` accounts.
 - The Openbox desktop layer is a staged runtime payload, not an in-OS package manager.
 - GNOME support is currently a package-bootstrapped desktop flavor, not a source-built ForgeOS desktop stack.

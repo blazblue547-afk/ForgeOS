@@ -6,7 +6,7 @@ Before=systemd-user-sessions.service getty.target forgeos-login@tty1.service for
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'if [ -d /home/forge ]; then chown -R 1000:1000 /home/forge && chmod 700 /home/forge; fi'
+ExecStart=/bin/sh -c 'if [ -d /home/forge ]; then chown -R 1000:1000 /home/forge 2>/dev/null || true; chmod 700 /home/forge 2>/dev/null || true; fi'
 
 [Install]
 WantedBy=multi-user.target

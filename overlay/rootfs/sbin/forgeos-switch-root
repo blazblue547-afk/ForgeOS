@@ -106,8 +106,7 @@ console_note "ForgeOS initramfs: locating real root filesystem..."
 ROOTDEV=$(wait_for_root_device) || drop_to_rescue "root partition not found" || exit 1
 
 mkdir -p "$NEWROOT"
-mount -t ext4 -o rw "$ROOTDEV" "$NEWROOT" 2>/dev/null || \
-    mount -t ext4 -o ro "$ROOTDEV" "$NEWROOT" 2>/dev/null || \
+mount -t ext4 -o ro "$ROOTDEV" "$NEWROOT" 2>/dev/null || \
     drop_to_rescue "could not mount $ROOTDEV" || exit 1
 
 if ! is_mounted_newroot; then

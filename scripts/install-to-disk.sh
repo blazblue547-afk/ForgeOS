@@ -7,9 +7,9 @@ source "$(dirname "$0")/common.sh"
 IMAGE_PATH="$OUT_DIR/forgeos-${KERNEL_VERSION}.img"
 DEVICE=""
 AUTO_CONFIRM=0
-EXPAND_ROOT=1
+EXPAND_WRITABLE=1
 LIST_ONLY=0
-RANDOMIZE_ROOT_UUID=1
+RANDOMIZE_FS_UUIDS=1
 UNMOUNT_TARGET=0
 CUSTOM_IMAGE=0
 
@@ -25,8 +25,10 @@ Options:
   --list                     Show candidate disk devices and exit.
   --yes                      Skip the interactive destruction prompt.
   --unmount                  Unmount non-critical mounted target partitions first.
-  --no-expand-root           Keep the root partition at the image's built size.
-  --keep-root-uuid           Preserve the ext4 root filesystem UUID.
+  --no-expand-apps           Keep the writable app/state partition at the image's built size.
+  --no-expand-root           Legacy alias for --no-expand-apps.
+  --keep-uuids               Preserve ext4 filesystem UUIDs.
+  --keep-root-uuid           Legacy alias for --keep-uuids.
   --help                     Show this help text.
 
 Examples:
@@ -128,7 +130,7 @@ ensure_target_is_safe() {
             ;;
     esac
 
-    for critical_mount in / /boot /boot/efi /home; do
+    for critical_mount in / /boot /boot/efi /home /nix /var /forge /opt /usr/local; do
         source=$(findmnt -nr -o SOURCE "$critical_mount" 2>/dev/null || true)
         if critical_source_on_target "$source"; then
             die "refusing to overwrite active system storage mounted at $critical_mount"
@@ -160,7 +162,7 @@ unmount_target_children() {
         part=${entry%%|*}
         mountpoint=${entry#*|}
         case "$mountpoint" in
-            /|/boot|/boot/efi|/home)
+            /|/boot|/boot/efi|/home|/nix|/var|/forge|/opt|/usr/local)
                 die "refusing to unmount critical mountpoint $mountpoint on $part"
                 ;;
         esac
@@ -225,45 +227,74 @@ repair_and_rescan_partitions() {
     udevadm settle >/dev/null 2>&1 || true
 }
 
-expand_root_partition() {
+partition_fstype() {
+    lsblk -dnro FSTYPE "$1" 2>/dev/null | head -n1
+}
+
+writable_partition_number() {
+    local apps_part
+
+    apps_part=$(partition_path "$DEVICE" 3)
+    if [[ -b "$apps_part" ]]; then
+        printf '3\n'
+    else
+        printf '2\n'
+    fi
+}
+
+expand_writable_partition() {
     local image_size
     local device_size
-    local root_part
+    local part_num
+    local target_part
+    local target_name
 
     image_size=$(stat -c %s "$IMAGE_PATH")
     device_size=$(device_size_bytes "$DEVICE")
-    root_part=$(partition_path "$DEVICE" 2)
+    part_num=$(writable_partition_number)
+    target_part=$(partition_path "$DEVICE" "$part_num")
+    if [[ "$part_num" == "3" ]]; then
+        target_name="app/state"
+    else
+        target_name="root"
+    fi
 
-    wait_for_block "$root_part"
+    wait_for_block "$target_part"
 
-    if (( device_size <= image_size )) || [[ "$EXPAND_ROOT" -ne 1 ]]; then
-        msg "leaving root partition at image size"
+    if (( device_size <= image_size )) || [[ "$EXPAND_WRITABLE" -ne 1 ]]; then
+        msg "leaving $target_name partition at image size"
         return
     fi
 
-    msg "expanding root partition to fill the remaining disk"
-    parted -s -f "$DEVICE" resizepart 2 100%
+    msg "expanding $target_name partition to fill the remaining disk"
+    parted -s -f "$DEVICE" resizepart "$part_num" 100%
     partprobe "$DEVICE" >/dev/null 2>&1 || true
     udevadm settle >/dev/null 2>&1 || true
-    wait_for_block "$root_part"
+    wait_for_block "$target_part"
 
-    msg "checking ext4 root filesystem"
-    e2fsck -fy "$root_part" >/dev/null
+    msg "checking ext4 $target_name filesystem"
+    e2fsck -fy "$target_part" >/dev/null
 
-    msg "resizing ext4 root filesystem"
-    resize2fs "$root_part" >/dev/null
+    msg "resizing ext4 $target_name filesystem"
+    resize2fs "$target_part" >/dev/null
 }
 
-randomize_root_uuid() {
-    local root_part
+randomize_ext4_uuids() {
+    local part_num
+    local part
+    local fs_type
 
-    [[ "$RANDOMIZE_ROOT_UUID" -eq 1 ]] || return 0
+    [[ "$RANDOMIZE_FS_UUIDS" -eq 1 ]] || return 0
 
-    root_part=$(partition_path "$DEVICE" 2)
-    wait_for_block "$root_part"
+    for part_num in 2 3; do
+        part=$(partition_path "$DEVICE" "$part_num")
+        [[ -b "$part" ]] || continue
+        fs_type=$(partition_fstype "$part")
+        [[ "$fs_type" == "ext4" ]] || continue
 
-    msg "randomizing ext4 root filesystem UUID"
-    tune2fs -U random "$root_part" >/dev/null
+        msg "randomizing ext4 filesystem UUID on $part"
+        tune2fs -U random "$part" >/dev/null
+    done
 }
 
 print_summary() {
@@ -296,12 +327,12 @@ while [[ $# -gt 0 ]]; do
             UNMOUNT_TARGET=1
             shift
             ;;
-        --no-expand-root)
-            EXPAND_ROOT=0
+        --no-expand-apps|--no-expand-root)
+            EXPAND_WRITABLE=0
             shift
             ;;
-        --keep-root-uuid)
-            RANDOMIZE_ROOT_UUID=0
+        --keep-uuids|--keep-root-uuid)
+            RANDOMIZE_FS_UUIDS=0
             shift
             ;;
         --help|-h)
@@ -339,8 +370,8 @@ fi
 confirm_install
 write_image
 repair_and_rescan_partitions
-expand_root_partition
-randomize_root_uuid
+expand_writable_partition
+randomize_ext4_uuids
 repair_and_rescan_partitions
 print_summary
 

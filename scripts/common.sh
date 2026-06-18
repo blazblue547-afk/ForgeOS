@@ -22,6 +22,8 @@ DESKTOP=${DESKTOP:-console}
 ENABLE_DESKTOP=${ENABLE_DESKTOP:-0}
 ROOT_LABEL=${ROOT_LABEL:-FORGE_ROOT}
 EFI_LABEL=${EFI_LABEL:-FORGE_EFI}
+APP_LABEL=${APP_LABEL:-FORGE_APPS}
+ATOMIC_BASE=${ATOMIC_BASE:-1}
 case "$DESKTOP" in
     console|gnome) ;;
     *)
@@ -83,6 +85,8 @@ SYSTEMD_STAGING_DIR="$STAGING_DIR/systemd"
 DBUS_STAGING_DIR="$STAGING_DIR/dbus"
 PAM_STAGING_DIR="$STAGING_DIR/pam"
 ROOTFS_STAGING_DIR="$STAGING_DIR/rootfs"
+BASE_ROOTFS_STAGING_DIR="$STAGING_DIR/rootfs-base"
+APPFS_STAGING_DIR="$STAGING_DIR/appfs"
 OPENBOX_DESKTOP_DEB_DIR=${OPENBOX_DESKTOP_DEB_DIR:-"$DOWNLOAD_DIR/openbox-desktop-debs"}
 OPENBOX_DESKTOP_APT_STATE_DIR=${OPENBOX_DESKTOP_APT_STATE_DIR:-"$BUILD_DIR/openbox-desktop-apt-state"}
 
@@ -114,6 +118,10 @@ truthy() {
             die "invalid boolean value: $1"
             ;;
     esac
+}
+
+atomic_base_enabled() {
+    [[ "$DESKTOP" != "gnome" ]] && truthy "$ATOMIC_BASE"
 }
 
 ensure_dirs() {
