@@ -231,14 +231,57 @@ partition_fstype() {
     lsblk -dnro FSTYPE "$1" 2>/dev/null | head -n1
 }
 
-writable_partition_number() {
-    local apps_part
+partition_partlabel() {
+    lsblk -dnro PARTLABEL "$1" 2>/dev/null | head -n1
+}
 
-    apps_part=$(partition_path "$DEVICE" 3)
-    if [[ -b "$apps_part" ]]; then
-        printf '3\n'
+partition_label() {
+    lsblk -dnro LABEL "$1" 2>/dev/null | head -n1
+}
+
+partition_number() {
+    lsblk -dnro PARTN "$1" 2>/dev/null | head -n1
+}
+
+device_partitions() {
+    lsblk -lnpo NAME "$DEVICE" | awk 'NR > 1 { print $1 }'
+}
+
+writable_partition_path() {
+    local part
+    local partlabel
+    local fs_label
+    local last_ext4=
+
+    while IFS= read -r part; do
+        [[ -b "$part" ]] || continue
+        partlabel=$(partition_partlabel "$part")
+        fs_label=$(partition_label "$part")
+        if [[ "$partlabel" == "apps" || "$fs_label" == "$APP_LABEL" ]]; then
+            printf '%s\n' "$part"
+            return 0
+        fi
+
+        if [[ "$(partition_fstype "$part")" == "ext4" ]]; then
+            last_ext4=$part
+        fi
+    done < <(device_partitions)
+
+    [[ -n "$last_ext4" ]] || return 1
+    printf '%s\n' "$last_ext4"
+}
+
+writable_partition_name() {
+    local part=$1
+    local partlabel
+    local fs_label
+
+    partlabel=$(partition_partlabel "$part")
+    fs_label=$(partition_label "$part")
+    if [[ "$partlabel" == "apps" || "$fs_label" == "$APP_LABEL" ]]; then
+        printf 'app/state\n'
     else
-        printf '2\n'
+        printf 'root\n'
     fi
 }
 
@@ -251,13 +294,10 @@ expand_writable_partition() {
 
     image_size=$(stat -c %s "$IMAGE_PATH")
     device_size=$(device_size_bytes "$DEVICE")
-    part_num=$(writable_partition_number)
-    target_part=$(partition_path "$DEVICE" "$part_num")
-    if [[ "$part_num" == "3" ]]; then
-        target_name="app/state"
-    else
-        target_name="root"
-    fi
+    target_part=$(writable_partition_path) || die "could not locate writable ForgeOS partition on $DEVICE"
+    part_num=$(partition_number "$target_part")
+    [[ -n "$part_num" ]] || die "could not determine partition number for $target_part"
+    target_name=$(writable_partition_name "$target_part")
 
     wait_for_block "$target_part"
 
@@ -280,21 +320,19 @@ expand_writable_partition() {
 }
 
 randomize_ext4_uuids() {
-    local part_num
     local part
     local fs_type
 
     [[ "$RANDOMIZE_FS_UUIDS" -eq 1 ]] || return 0
 
-    for part_num in 2 3; do
-        part=$(partition_path "$DEVICE" "$part_num")
+    while IFS= read -r part; do
         [[ -b "$part" ]] || continue
         fs_type=$(partition_fstype "$part")
         [[ "$fs_type" == "ext4" ]] || continue
 
         msg "randomizing ext4 filesystem UUID on $part"
         tune2fs -U random "$part" >/dev/null
-    done
+    done < <(device_partitions)
 }
 
 print_summary() {
@@ -352,7 +390,7 @@ fi
 
 [[ -n "$DEVICE" ]] || die "missing required --device argument"
 
-require_cmd lsblk findmnt parted partprobe dd blockdev e2fsck resize2fs tune2fs udevadm flock
+require_cmd lsblk findmnt parted partprobe dd blockdev e2fsck resize2fs tune2fs udevadm flock awk
 require_root
 ensure_dirs
 

@@ -13,7 +13,7 @@ It installs the built raw ForgeOS image to a real block device from an existing 
 3. optionally unmounts non-critical target partitions
 4. writes the ForgeOS raw image to the target disk
 5. repairs the GPT backup header on larger disks
-6. expands the writable app/state partition to fill the device
+6. finds the writable app/state partition by label and expands it to fill the device
 7. randomizes ext4 filesystem UUIDs by default
 
 ## Basic Usage
@@ -82,8 +82,9 @@ Enroll `out/secure-boot/ForgeOS.cer` in the target firmware Secure Boot database
 
 - The installer is destructive. It erases the target disk.
 - Run it from a Linux host, not from the disk you are installing over.
-- The current boot model uses a built-in kernel command line with `root=PARTLABEL=root`.
-- Normal ForgeOS images use partition `2` for the read-only base OS and partition `3` for mutable apps and state.
+- The default GRUB boot path uses `root=PARTLABEL=root` for the current base slot and offers a rollback selector for additional base slots. The primary selector entries use an initramfs-assisted fixed-framebuffer handoff for recovery visibility.
+- Normal ForgeOS images use partition `2` for the current read-only base OS. With the default `ROLLBACK_SLOTS=2`, partition `3` is the rollback base slot and partition `4` is mutable apps and state. With `ROLLBACK_SLOTS=1`, partition `3` is mutable apps and state.
+- After installation, use `forgeos-rollback create` from the running OS to refresh the rollback base slot before making base OS changes.
 - Avoid leaving multiple ForgeOS installations attached during early testing, because multiple disks with the same GPT partition label can confuse root selection.
 - Secure Boot trust is tied to the enrolled signing certificate. Protect the generated private key.
 

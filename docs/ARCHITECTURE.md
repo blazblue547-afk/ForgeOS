@@ -22,13 +22,15 @@ ForgeOS currently targets UEFI systems.
 
 1. The disk image contains a GPT.
 2. Partition 1 is a FAT32 EFI System Partition labeled `FORGE_EFI`.
-3. Partition 2 is an ext4 base OS partition labeled `FORGE_ROOT` with GPT partition label `root`.
-4. Partition 3 is an ext4 writable app/state partition labeled `FORGE_APPS` with GPT partition label `apps`.
-5. By default, `out/BOOTX64.EFI` is a standalone GRUB UEFI fallback loader with a small debug boot menu.
-6. The built kernel EFI stub is copied to `EFI/BOOT/FORGEOS.EFI`.
-7. UEFI firmware executes GRUB from `EFI/BOOT/BOOTX64.EFI`, and GRUB starts the kernel.
-8. The kernel mounts `PARTLABEL=root` as the real root filesystem with `ro` so the base OS stays atomic.
-9. systemd starts as `/sbin/init`, mounts the app layer at `/forge`, bind-mounts mutable paths from it, activates the D-Bus system bus, starts `systemd-logind`, `systemd-resolved`, and `systemd-networkd`, reaches `multi-user.target`, and launches PAM-backed login prompts on `tty1` and `ttyS0`.
+3. Partition 2 is the current ext4 base OS slot labeled `FORGE_ROOT` with GPT partition label `root`.
+4. Normal atomic images reserve additional read-only base OS slots for rollback selection. With the default `ROLLBACK_SLOTS=2`, partition 3 is labeled `FORGE_ROOT_1` with GPT partition label `root-rollback`.
+5. The ext4 writable app/state partition is labeled `FORGE_APPS` with GPT partition label `apps`. With the default rollback layout it is partition 4; with `ROLLBACK_SLOTS=1` it is partition 3.
+6. By default, `out/BOOTX64.EFI` is a standalone GRUB UEFI fallback loader with a small debug boot menu.
+7. The built kernel EFI stub is copied to `EFI/BOOT/FORGEOS.EFI`.
+8. UEFI firmware executes GRUB from `EFI/BOOT/BOOTX64.EFI`, and GRUB starts the kernel.
+9. The default menu mounts `PARTLABEL=root` as the real root filesystem with `ro` so the current base OS stays atomic.
+10. The GRUB rollback selector can instead boot another base slot such as `PARTLABEL=root-rollback`.
+11. systemd starts as `/sbin/init`, mounts the app layer at `/forge`, bind-mounts mutable paths from it, activates the D-Bus system bus, starts `systemd-logind`, `systemd-resolved`, and `systemd-networkd`, reaches `multi-user.target`, and launches PAM-backed login prompts on `tty1` and `ttyS0`.
 
 ## Root Filesystem Model
 
@@ -45,10 +47,24 @@ The canonical root filesystem is assembled in `staging/rootfs` from:
 
 For normal ForgeOS disk images, `scripts/build-image.sh` derives two trees from `staging/rootfs`:
 
-- `staging/rootfs-base`: the read-only base OS used for partition 2
-- `staging/appfs`: the writable app/state layer used for partition 3
+- `staging/rootfs-base`: the read-only base OS copied into each base slot
+- `staging/appfs`: the writable app/state layer used for the `apps` partition
 
 The base tree keeps the source-built OS, boot-critical tools, systemd units, configuration, and symlinks into `/nix/store`. The app/state tree owns `/nix`, `/home`, `/root`, `/var`, `/opt`, and `/usr/local`. The image builder writes an `/etc/fstab` into `staging/rootfs-base` that mounts `LABEL=FORGE_APPS` at `/forge` and bind-mounts those paths back into the normal filesystem layout. `/tmp` is a tmpfs. The canonical `staging/rootfs` used for `rootfs.cpio.gz` does not include those app-layer fstab entries, so the direct initramfs smoke-test path stays monolithic and does not wait for a disk app partition.
+
+## Rollback Selection
+
+Atomic ForgeOS images build `ROLLBACK_SLOTS=2` by default. Slot 0 is the normal current base at `PARTLABEL=root`; slot 1 is a rollback base at `PARTLABEL=root-rollback`. Additional slots can be requested with higher `ROLLBACK_SLOTS` values and receive GPT labels such as `root-rollback-2`.
+
+The GRUB fallback loader emits a `ForgeOS rollback selector` submenu with entries for each base slot. On console images, the main selector entry for each slot uses the initramfs-assisted handoff path with fixed framebuffer settings so a recovery boot stays visible even when the direct kernel path cannot mount the requested slot or loses display output. Each slot also has normal-display and direct-kernel entries for comparison. The early `forgeos-switch-root` helper parses the selected `root=` or `forgeos.root=` argument so it switches into the requested `PARTLABEL`, `LABEL`, `UUID`, `PARTUUID`, or explicit `/dev/...` root device instead of assuming the current slot.
+
+`BOOTLOADER=stub` signs or copies the kernel EFI stub directly and therefore has no interactive rollback menu. The default kernel build does not bake in a root slot, so the stub path requires a kernel built with `CONFIG_CMDLINE_BOOL=y` or firmware-provided EFI load options.
+
+The `forgeos-rollback` command provides the first in-OS management layer for these slots. It can list slots, copy the currently booted base into an inactive rollback slot with `forgeos-rollback create`, and promote a booted rollback slot back to `root` with `forgeos-rollback promote`. Slot copying is block-level, so the source root should be mounted read-only and the destination slot must be unmounted.
+
+If `tune2fs` is available, `forgeos-rollback` randomizes the destination filesystem UUID and restores the expected filesystem label after copying. Without `tune2fs`, the copy still works for GRUB selection because boot entries use GPT partition labels, but the command warns that the ext4 UUID and label may still match the source.
+
+ForgeOS still needs a declarative NixOS-style base OS rebuild/update flow that prepares a new base deployment and calls this slot machinery automatically.
 
 The default network path uses DHCP through `systemd-networkd`. DNS servers learned from DHCP are exposed through `systemd-resolved`, and `/etc/resolv.conf` is a symlink to the resolved-managed compatibility file at `/run/systemd/resolve/resolv.conf`. Tools that query systemd over D-Bus use the system bus at `/run/dbus/system_bus_socket`. The source-built systemd layer also includes `systemd-logind`, `loginctl`, `pam_systemd.so`, the `org.freedesktop.login1` system-bus policy, and the logind varlink socket. Console login uses BusyBox `getty` and `login`; `/etc/pam.d/login` authenticates against `/etc/shadow` with `pam_unix.so` and registers sessions with `pam_systemd.so`.
 
@@ -99,13 +115,12 @@ This is enough for a first CLI OS image and a development boot path, but not yet
 - Microsoft/shim-signed Secure Boot chain
 - measured boot and full verified boot
 - full laptop Wi-Fi and firmware coverage
-- declarative NixOS-style system rebuilds and rollback management
+- declarative NixOS-style system rebuilds and automated rollback-slot population
 - source-built GNOME and graphical desktop dependency closure
 - source-built Openbox/Xorg/GTK graphical dependency closure
 - source-built dependency closure for systemd and D-Bus runtime libraries
 - account management beyond the built-in `forge` and `root` users
 - in-OS guided installer and update system
-- base OS rollback selection across multiple base deployments
 - hardening review of the kernel and userspace defaults
 
 ## Suggested Next Steps

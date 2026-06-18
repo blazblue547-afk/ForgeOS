@@ -30,15 +30,80 @@ console_note() {
     done
 }
 
-find_root_device() {
+cmdline_value() {
+    local key=$1
+    local arg
+    local value=
+
+    for arg in $(cat /proc/cmdline 2>/dev/null); do
+        case "$arg" in
+            "$key="*)
+                value=${arg#*=}
+                ;;
+        esac
+    done
+
+    [ -n "$value" ] || return 1
+    printf '%s\n' "$value"
+}
+
+requested_root_spec() {
+    local spec
+
+    spec=$(cmdline_value forgeos.root 2>/dev/null || true)
+    if [ -z "$spec" ]; then
+        spec=$(cmdline_value root 2>/dev/null || true)
+    fi
+
+    case "$spec" in
+        ''|rootfs|tmpfs)
+            return 1
+            ;;
+    esac
+
+    printf '%s\n' "$spec"
+}
+
+lookup_root_symlink() {
+    local kind=$1
+    local value=$2
+    local path
+
+    case "$kind" in
+        PARTLABEL)
+            path=/dev/disk/by-partlabel/$value
+            ;;
+        LABEL)
+            path=/dev/disk/by-label/$value
+            ;;
+        UUID)
+            path=/dev/disk/by-uuid/$value
+            ;;
+        PARTUUID)
+            path=/dev/disk/by-partuuid/$value
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    [ -b "$path" ] || return 1
+    printf '%s\n' "$path"
+}
+
+blkid_matches() {
+    local info=$1
+    local kind=$2
+    local value=$3
+
+    printf '%s\n' "$info" | grep -F " $kind=\"$value\"" >/dev/null 2>&1
+}
+
+scan_matching_root_device() {
+    local kind=$1
+    local value=$2
     local dev
     local info
-
-    for dev in /dev/disk/by-partlabel/root /dev/disk/by-label/FORGE_ROOT; do
-        [ -b "$dev" ] || continue
-        printf '%s\n' "$dev"
-        return 0
-    done
 
     for dev in \
         /dev/nvme[0-9]n[0-9]p[0-9] \
@@ -47,12 +112,63 @@ find_root_device() {
         /dev/vd[a-z][0-9]; do
         [ -b "$dev" ] || continue
         info=$(blkid "$dev" 2>/dev/null || true)
-        case "$info" in
-            *' PARTLABEL="root"'*|*' LABEL="FORGE_ROOT"'*)
-                printf '%s\n' "$dev"
-                return 0
-                ;;
-        esac
+        blkid_matches "$info" "$kind" "$value" || continue
+        printf '%s\n' "$dev"
+        return 0
+    done
+
+    return 1
+}
+
+find_requested_root_device() {
+    local spec=$1
+    local kind
+    local value
+
+    case "$spec" in
+        PARTLABEL=*)
+            kind=PARTLABEL
+            value=${spec#PARTLABEL=}
+            ;;
+        LABEL=*)
+            kind=LABEL
+            value=${spec#LABEL=}
+            ;;
+        UUID=*)
+            kind=UUID
+            value=${spec#UUID=}
+            ;;
+        PARTUUID=*)
+            kind=PARTUUID
+            value=${spec#PARTUUID=}
+            ;;
+        /dev/*)
+            [ -b "$spec" ] || return 1
+            printf '%s\n' "$spec"
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    lookup_root_symlink "$kind" "$value" || scan_matching_root_device "$kind" "$value"
+}
+
+find_root_device() {
+    local dev
+    local spec
+
+    spec=$(requested_root_spec 2>/dev/null || true)
+    if [ -n "$spec" ]; then
+        find_requested_root_device "$spec"
+        return $?
+    fi
+
+    for dev in /dev/disk/by-partlabel/root /dev/disk/by-label/FORGE_ROOT; do
+        [ -b "$dev" ] || continue
+        printf '%s\n' "$dev"
+        return 0
     done
 
     return 1

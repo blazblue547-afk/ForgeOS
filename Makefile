@@ -14,6 +14,7 @@ export ROOT_LABEL ?= FORGE_ROOT
 export EFI_LABEL ?= FORGE_EFI
 export APP_LABEL ?= FORGE_APPS
 export ATOMIC_BASE ?= 1
+export ROLLBACK_SLOTS ?= 2
 desktop_enabled := $(filter 1 true TRUE yes YES on ON,$(ENABLE_DESKTOP))
 export IMAGE_SIZE_MIB ?= $(if $(filter gnome,$(DESKTOP)),12288,$(if $(desktop_enabled),6144,4096))
 export ESP_SIZE_MIB ?= 256
@@ -43,6 +44,7 @@ help:
 		'  make gnome-rootfs - assemble a Debian GNOME desktop rootfs' \
 		'  make image      - build a bootable GPT/UEFI disk image' \
 		'  make image builds an atomic read-only base plus writable app/state layer' \
+		'  ROLLBACK_SLOTS=1 make image - disable extra base rollback slots' \
 		'  make gnome-image - build a bootable GPT/UEFI GNOME disk image' \
 		'  make secure-boot-keys - generate a local Secure Boot signing keypair' \
 		'  make run        - boot kernel + initramfs in QEMU' \

@@ -168,6 +168,7 @@ chmod 755 \
     "$ROOTFS_STAGING_DIR/sbin/forgeos-switch-root" \
     "$ROOTFS_STAGING_DIR/usr/lib/forgeos/nix-bootstrap" \
     "$ROOTFS_STAGING_DIR/usr/bin/forgeos-app" \
+    "$ROOTFS_STAGING_DIR/usr/sbin/forgeos-rollback" \
     "$ROOTFS_STAGING_DIR/usr/bin/neofetch" \
     "$ROOTFS_STAGING_DIR/usr/share/udhcpc/default.script"
 chmod 700 "$ROOTFS_STAGING_DIR/root" "$ROOTFS_STAGING_DIR/home/forge"

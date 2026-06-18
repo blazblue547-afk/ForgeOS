@@ -15,10 +15,6 @@ mkdir -p "$KERNEL_BUILD_DIR" "$MODULES_STAGING_DIR"
 
 make -C "$KERNEL_SRC_DIR" O="$KERNEL_BUILD_DIR" ARCH="$ARCH" x86_64_defconfig
 apply_kconfig_fragment "$KERNEL_BUILD_DIR/.config" "$ROOT_DIR/config/kernel.fragment"
-cmdline_fragment=$(mktemp)
-printf 'CONFIG_CMDLINE="root=PARTLABEL=root rootfstype=ext4 rootwait ro console=tty0 console=ttyS0,115200n8 loglevel=7 ignore_loglevel i915.enable_psr=0 i915.fastboot=0"\n' > "$cmdline_fragment"
-apply_kconfig_fragment "$KERNEL_BUILD_DIR/.config" "$cmdline_fragment"
-rm -f "$cmdline_fragment"
 make -C "$KERNEL_SRC_DIR" O="$KERNEL_BUILD_DIR" ARCH="$ARCH" olddefconfig
 
 msg "building Linux ${KERNEL_VERSION}"
