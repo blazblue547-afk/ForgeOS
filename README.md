@@ -40,6 +40,8 @@ cd /home/joe/forgeos
 sudo scripts/install-deps.sh
 make rootfs
 make run
+sudo apt install libsystemd-dev
+sudo apt install fakeroot
 ```
 
 That dependency script is for Debian/Ubuntu hosts and installs only the packages needed for the console rootfs plus direct QEMU boot path. The build path then builds the kernel, Linux-PAM, systemd, D-Bus, BusyBox rescue tools, and a compressed initramfs, then boots it directly in QEMU over serial.
